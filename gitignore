@@ -1,0 +1,23 @@
+# Credenciales y tokens — NUNCA subir al repo público
+.env
+.env.local
+mcp/config.local.json
+
+# Contextos y memorias de proyectos reales
+projects-memories/*/context.md
+projects-memories/*/memory-*.md
+projects-memories/*/tasks.json
+projects-memories/*/progress.json
+projects-memories/*/contracts/*.json
+
+# Excepción — ejemplos y plantillas sí se suben
+!projects-memories/context_example.md
+!projects-memories/contracts_README.md
+!projects-memories/example-project/
+
+# Node
+node_modules/
+dist/
+
+# OS
+.DS_Store

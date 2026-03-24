@@ -1,0 +1,93 @@
+{
+  "proyecto": "example-project",
+  "sprint": 1,
+  "historias": [
+    {
+      "hu": "HU-001",
+      "titulo": "Registro y listado de alumnos",
+      "descripcion": "Como Director quiero registrar alumnos y verlos por grupo para tener el control del plantel.",
+      "criterios_aceptacion": [
+        "Puedo registrar un alumno con nombre, apellidos, CURP y grupo",
+        "Puedo ver la lista de alumnos de un grupo",
+        "No se puede registrar un alumno con una CURP duplicada",
+        "Los alumnos inactivos no aparecen en el listado por defecto"
+      ],
+      "status": "en_progreso",
+      "tareas": [
+        {
+          "id": "T001",
+          "agente": "dba",
+          "descripcion": "Crear tabla alumnos con migración versionada",
+          "status": "completado",
+          "dependencias": [],
+          "contrato": null,
+          "rama": "feat-HU001",
+          "completado_en": "2026-01-14"
+        },
+        {
+          "id": "T002",
+          "agente": "backend",
+          "descripcion": "Definir contratos CTR-001 y CTR-002 con el Frontend",
+          "status": "completado",
+          "dependencias": ["T001"],
+          "contrato": null,
+          "rama": "feat-HU001",
+          "completado_en": "2026-01-15",
+          "notas": "Contratos acordados y guardados en contracts/"
+        },
+        {
+          "id": "T003",
+          "agente": "backend",
+          "descripcion": "Implementar GET /api/alumnos y POST /api/alumnos",
+          "status": "en_progreso",
+          "dependencias": ["T001", "T002"],
+          "contrato": ["CTR-001", "CTR-002"],
+          "rama": "feat-HU001",
+          "completado_en": null
+        },
+        {
+          "id": "T004",
+          "agente": "frontend",
+          "descripcion": "Componente AlumnosList — vista de listado",
+          "status": "en_progreso",
+          "dependencias": ["T002"],
+          "contrato": ["CTR-001"],
+          "rama": "feat-HU001",
+          "completado_en": null,
+          "notas": "Puede avanzar con frontend_mock del CTR-001 mientras T003 termina"
+        },
+        {
+          "id": "T005",
+          "agente": "frontend",
+          "descripcion": "Componente AlumnoForm — formulario de registro",
+          "status": "pendiente",
+          "dependencias": ["T003", "T004"],
+          "contrato": ["CTR-002"],
+          "rama": "feat-HU001",
+          "completado_en": null,
+          "notas": "Espera T003 (endpoint real) para reemplazar mock por llamada real"
+        },
+        {
+          "id": "T006",
+          "agente": "tester",
+          "descripcion": "E2E flujo completo: registrar alumno y verlo en la lista",
+          "status": "pendiente",
+          "dependencias": ["T003", "T004", "T005"],
+          "contrato": null,
+          "rama": "feat-HU001",
+          "completado_en": null
+        },
+        {
+          "id": "T007",
+          "agente": "docs",
+          "descripcion": "Documentar endpoints CTR-001 y CTR-002 en Swagger",
+          "status": "pendiente",
+          "dependencias": ["T003", "T006"],
+          "contrato": ["CTR-001", "CTR-002"],
+          "rama": "feat-HU001",
+          "completado_en": null
+        }
+      ]
+    }
+  ]
+}

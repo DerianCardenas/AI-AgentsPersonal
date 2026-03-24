@@ -1,0 +1,90 @@
+{
+  "contract_id": "CTR-001",
+  "hu": "HU-001",
+  "status": "agreed",
+  "agreed_at": "2026-01-15",
+  "agreed_by": ["backend", "frontend"],
+
+  "endpoint": {
+    "method": "GET",
+    "path": "/api/alumnos",
+    "description": "Lista todos los alumnos de un grupo"
+  },
+
+  "request": {
+    "headers": {
+      "Authorization": "Bearer {token}"
+    },
+    "query_params": {
+      "grupoId": {
+        "type": "number",
+        "required": true,
+        "description": "ID del grupo a consultar"
+      },
+      "soloActivos": {
+        "type": "boolean",
+        "required": false,
+        "default": true,
+        "description": "Si es true, solo devuelve alumnos activos"
+      }
+    },
+    "body": null
+  },
+
+  "response": {
+    "success": {
+      "status": 200,
+      "body": [
+        {
+          "id": 1,
+          "nombre": "Juan",
+          "apPaterno": "García",
+          "apMaterno": "López",
+          "curp": "GARJ900101HDFRCN01",
+          "activo": true
+        }
+      ]
+    },
+    "errors": [
+      {
+        "status": 400,
+        "when": "grupoId no fue proporcionado o es inválido",
+        "body": { "message": "El parámetro grupoId es requerido." }
+      },
+      {
+        "status": 401,
+        "when": "Token no proporcionado o expirado",
+        "body": { "message": "No autorizado." }
+      },
+      {
+        "status": 404,
+        "when": "El grupo no existe",
+        "body": { "message": "Grupo no encontrado." }
+      }
+    ]
+  },
+
+  "notes": "El frontend usa soloActivos=true por defecto. Solo el Director puede pasar soloActivos=false para ver el historial completo.",
+
+  "frontend_mock": {
+    "description": "Usar este mock mientras el backend implementa el endpoint",
+    "data": [
+      {
+        "id": 1,
+        "nombre": "Juan",
+        "apPaterno": "García",
+        "apMaterno": "López",
+        "curp": "GARJ900101HDFRCN01",
+        "activo": true
+      },
+      {
+        "id": 2,
+        "nombre": "María",
+        "apPaterno": "Hernández",
+        "apMaterno": null,
+        "curp": "HERM950202MDFRCN02",
+        "activo": true
+      }
+    ]
+  }
+}

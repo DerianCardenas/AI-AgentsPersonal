@@ -1,0 +1,20 @@
+{
+  "name": "ai-agents-orchestrator",
+  "version": "1.0.0",
+  "description": "AI multi-agent orchestrator for software development",
+  "main": "orchestrator/orchestrator.ts",
+  "scripts": {
+    "start": "ts-node orchestrator/orchestrator.ts",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.36.0",
+    "dotenv": "^16.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.0"
+  }
+}

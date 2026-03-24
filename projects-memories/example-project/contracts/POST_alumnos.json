@@ -1,0 +1,98 @@
+{
+  "contract_id": "CTR-002",
+  "hu": "HU-001",
+  "status": "agreed",
+  "agreed_at": "2026-01-15",
+  "agreed_by": ["backend", "frontend"],
+
+  "endpoint": {
+    "method": "POST",
+    "path": "/api/alumnos",
+    "description": "Crea un nuevo alumno"
+  },
+
+  "request": {
+    "headers": {
+      "Authorization": "Bearer {token}",
+      "Content-Type": "application/json"
+    },
+    "query_params": null,
+    "body": {
+      "nombre": {
+        "type": "string",
+        "required": true,
+        "max_length": 100,
+        "description": "Nombre(s) del alumno"
+      },
+      "apPaterno": {
+        "type": "string",
+        "required": true,
+        "max_length": 100,
+        "description": "Apellido paterno"
+      },
+      "apMaterno": {
+        "type": "string",
+        "required": false,
+        "max_length": 100,
+        "description": "Apellido materno (opcional)"
+      },
+      "curp": {
+        "type": "string",
+        "required": true,
+        "format": "^[A-Z]{4}\\d{6}[HM][A-Z]{5}[A-Z\\d]\\d$",
+        "description": "CURP en formato oficial"
+      },
+      "grupoId": {
+        "type": "number",
+        "required": true,
+        "description": "ID del grupo al que pertenece"
+      }
+    }
+  },
+
+  "response": {
+    "success": {
+      "status": 201,
+      "body": {
+        "id": 3,
+        "nombre": "Pedro",
+        "apPaterno": "Martínez",
+        "apMaterno": "Ruiz",
+        "curp": "MARP010101HDFRZD03",
+        "activo": true
+      }
+    },
+    "errors": [
+      {
+        "status": 400,
+        "when": "Algún campo requerido falta o tiene formato inválido",
+        "body": {
+          "message": "Datos inválidos.",
+          "errors": {
+            "curp": ["La CURP no tiene el formato correcto."],
+            "nombre": ["El nombre es obligatorio."]
+          }
+        }
+      },
+      {
+        "status": 409,
+        "when": "Ya existe un alumno con esa CURP",
+        "body": { "message": "Ya existe un alumno con la CURP proporcionada." }
+      }
+    ]
+  },
+
+  "notes": "El frontend debe validar el formato de CURP antes de enviar. El backend también valida — nunca confiar solo en el frontend.",
+
+  "frontend_mock": {
+    "description": "Simular respuesta exitosa mientras backend implementa",
+    "data": {
+      "id": 99,
+      "nombre": "Pedro",
+      "apPaterno": "Martínez",
+      "apMaterno": "Ruiz",
+      "curp": "MARP010101HDFRZD03",
+      "activo": true
+    }
+  }
+}
