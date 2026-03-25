@@ -1,7 +1,7 @@
-import Anthropic from "@anthropic-ai/sdk";
-import * as fs from "fs";
-import * as path from "path";
+import * as fs     from "fs";
+import * as path   from "path";
 import * as dotenv from "dotenv";
+import { createProvider } from "./providers/base";
 
 dotenv.config();
 
@@ -16,80 +16,51 @@ interface AgentConfig {
   mcpTools: string[];
 }
 
-interface ProjectContext {
-  name:     string;
-  rootPath: string;
-  context:  string;
-  tasks?:   string;
-  memories: Partial<Record<AgentName, string>>;
-  repos: {
-    back?:  string;
-    front?: string;
-    db?:    string;
-    test?:  string;
-  };
+interface ProjectEnvConfig {
+  back:     string;
+  front:    string;
+  db:       string;
+  test:     string;
+  postgres: string;
 }
 
-interface RunResult {
-  agent:    AgentName;
-  task:     string;
-  response: string;
-  success:  boolean;
+interface ProjectContext {
+  name:      string;
+  rootPath:  string;
+  context:   string;
+  tasks?:    string;
+  envConfig: ProjectEnvConfig;
+  memories:  Partial<Record<AgentName, string>>;
 }
 
 // ─────────────────────────────────────────────────────────────
 // CONFIGURACIÓN DE AGENTES
-// Modelo y MCPs asignados a cada agente
+// Modelos leídos del .env — cambia el modelo sin tocar código
+//
+// Prefijos válidos para detección automática de proveedor:
+//   claude-*  → Anthropic
+//   gemini-*  → Google
+//   gpt-*     → OpenAI
 // ─────────────────────────────────────────────────────────────
 
 const AGENT_CONFIGS: Record<AgentName, AgentConfig> = {
-  po: {
-    model:    "claude-opus-4-5",
-    mcpTools: ["brave-search"],
-  },
-  scrum: {
-    model:    "claude-opus-4-5",
-    mcpTools: ["filesystem"],
-  },
-  dba: {
-    model:    "claude-sonnet-4-5",
-    mcpTools: ["filesystem", "postgres", "git", "github"],
-  },
-  backend: {
-    model:    "claude-sonnet-4-5",
-    mcpTools: ["filesystem", "git", "github", "brave-search"],
-  },
-  frontend: {
-    model:    "claude-sonnet-4-5",
-    mcpTools: ["filesystem", "git", "github", "brave-search"],
-  },
-  tester: {
-    model:    "claude-haiku-4-5",
-    mcpTools: ["filesystem", "git", "github", "postgres"],
-  },
-  docs: {
-    model:    "claude-haiku-4-5",
-    mcpTools: ["filesystem", "git", "github"],
-  },
+  po:       { model: process.env.MODEL_PO       ?? "claude-opus-4-6",   mcpTools: ["brave-search", "filesystem"] },
+  scrum:    { model: process.env.MODEL_SCRUM    ?? "claude-opus-4-6",   mcpTools: ["filesystem"] },
+  dba:      { model: process.env.MODEL_DBA      ?? "gemini-2.5-pro",    mcpTools: ["filesystem", "postgres", "git", "github"] },
+  backend:  { model: process.env.MODEL_BACKEND  ?? "gemini-2.5-pro",    mcpTools: ["filesystem", "git", "github", "brave-search"] },
+  frontend: { model: process.env.MODEL_FRONTEND ?? "gemini-2.5-pro",    mcpTools: ["filesystem", "git", "github", "brave-search"] },
+  tester:   { model: process.env.MODEL_TESTER   ?? "gemini-2.5-flash",  mcpTools: ["filesystem", "git", "github", "postgres"] },
+  docs:     { model: process.env.MODEL_DOCS     ?? "gemini-2.5-flash",  mcpTools: ["filesystem", "git", "github"] },
 };
-
-// ─────────────────────────────────────────────────────────────
-// PATHS BASE
-// ─────────────────────────────────────────────────────────────
-
-const AGENTS_ROOT   = process.env.AGENTS_ROOT   ?? path.resolve(__dirname, "..");
-const PROJECTS_ROOT = process.env.PROJECTS_ROOT ?? path.resolve(__dirname, "../../projects");
 
 // ─────────────────────────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────────────────────────
 
+const AGENTS_ROOT = process.env.AGENTS_ROOT ?? path.resolve(__dirname, "..");
+
 function readFile(filePath: string): string {
-  try {
-    return fs.readFileSync(filePath, "utf-8");
-  } catch {
-    return "";
-  }
+  try { return fs.readFileSync(filePath, "utf-8"); } catch { return ""; }
 }
 
 function writeFile(filePath: string, content: string): void {
@@ -97,12 +68,60 @@ function writeFile(filePath: string, content: string): void {
   fs.writeFileSync(filePath, content, "utf-8");
 }
 
-function loadRole(agent: AgentName): string {
-  const rolePath = path.join(AGENTS_ROOT, "roles", `${agent}.md`);
-  const role = readFile(rolePath);
-  if (!role) throw new Error(`Rol no encontrado: ${rolePath}`);
-  return role;
+// ─────────────────────────────────────────────────────────────
+// LEER CONFIGURACIÓN DEL PROYECTO DESDE .env
+// Convención: {NOMBRE_PROYECTO}_BACK, _FRONT, _DB, _TEST, _POSTGRES
+// Ejemplo: ESCOLAR_BACK=/ruta/back-repo
+// ─────────────────────────────────────────────────────────────
+
+function loadProjectEnvConfig(projectName: string): ProjectEnvConfig {
+  const key = projectName.toUpperCase();
+
+  const get = (suffix: string): string => {
+    const val = process.env[`${key}_${suffix}`];
+    if (!val) console.warn(`⚠️  Variable de entorno no encontrada: ${key}_${suffix}`);
+    return val ?? "";
+  };
+
+  return {
+    back:     get("BACK"),
+    front:    get("FRONT"),
+    db:       get("DB"),
+    test:     get("TEST"),
+    postgres: get("POSTGRES"),
+  };
 }
+
+function loadProjectContext(projectName: string): ProjectContext {
+  const memoriesPath   = path.join(AGENTS_ROOT, "projects-memories", projectName);
+  const contextContent = readFile(path.join(memoriesPath, "context.md"));
+
+  if (!contextContent) {
+    throw new Error(
+      `context.md no encontrado en: ${memoriesPath}\n` +
+      `Crea el archivo copiando context_example.md`
+    );
+  }
+
+  return {
+    name:      projectName,
+    rootPath:  memoriesPath,
+    context:   contextContent,
+    tasks:     readFile(path.join(memoriesPath, "tasks.json")),
+    envConfig: loadProjectEnvConfig(projectName),
+    memories: {
+      dba:      readFile(path.join(memoriesPath, "memory-dba.md")),
+      backend:  readFile(path.join(memoriesPath, "memory-backend.md")),
+      frontend: readFile(path.join(memoriesPath, "memory-frontend.md")),
+      tester:   readFile(path.join(memoriesPath, "memory-tester.md")),
+      docs:     readFile(path.join(memoriesPath, "memory-docs.md")),
+    },
+  };
+}
+
+// ─────────────────────────────────────────────────────────────
+// SKILLS
+// ─────────────────────────────────────────────────────────────
 
 function loadSkills(agent: AgentName, projectName: string): string {
   const skillMap: Partial<Record<AgentName, string[]>> = {
@@ -112,239 +131,91 @@ function loadSkills(agent: AgentName, projectName: string): string {
     tester:   ["dotnet/unit-test-xunit.md"],
   };
 
-  const baseSkills = skillMap[agent] ?? [];
-  let skillsContent = "";
+  let skills = "";
 
-  // 1. Cargar skills base del stack
-  for (const skillFile of baseSkills) {
-    const skillPath = path.join(AGENTS_ROOT, "skills", skillFile);
-    const content = readFile(skillPath);
-    if (content) skillsContent += `\n\n---\n${content}`;
+  for (const f of skillMap[agent] ?? []) {
+    const base = readFile(path.join(AGENTS_ROOT, "skills", f));
+    if (base) skills += `\n\n---\n${base}`;
+
+    const override = readFile(path.join(AGENTS_ROOT, "projects-memories", projectName, "skills", path.basename(f)));
+    if (override) skills += `\n\n---\n[OVERRIDE DEL PROYECTO]\n${override}`;
   }
 
-  // 2. Cargar overrides del proyecto (si existen)
-  for (const skillFile of baseSkills) {
-    const overridePath = path.join(
-      AGENTS_ROOT, "projects-memories", projectName, "skills",
-      path.basename(skillFile)
-    );
-    const override = readFile(overridePath);
-    if (override) skillsContent += `\n\n---\n[OVERRIDE DEL PROYECTO]\n${override}`;
-  }
-
-  return skillsContent;
+  return skills;
 }
 
-function loadConventions(): string {
-  return readFile(path.join(AGENTS_ROOT, "conventions.md"));
-}
-
-function loadProjectContext(projectName: string): ProjectContext {
-  const memoriesPath = path.join(AGENTS_ROOT, "projects-memories", projectName);
-
-  const contextContent = readFile(path.join(memoriesPath, "context.md"));
-  if (!contextContent) {
-    throw new Error(`context.md no encontrado para el proyecto: ${projectName}`);
-  }
-
-  // Extraer rutas de repos desde context.md (formato: "back-repo: ~/projects/...")
-  const extractRepo = (key: string): string | undefined => {
-    const match = contextContent.match(new RegExp(`${key}:\\s*(.+)`));
-    return match?.[1]?.trim().replace("~", process.env.HOME ?? "");
-  };
-
-  return {
-    name:     projectName,
-    rootPath: memoriesPath,
-    context:  contextContent,
-    tasks:    readFile(path.join(memoriesPath, "tasks.json")),
-    memories: {
-      dba:      readFile(path.join(memoriesPath, "memory-dba.md")),
-      backend:  readFile(path.join(memoriesPath, "memory-backend.md")),
-      frontend: readFile(path.join(memoriesPath, "memory-frontend.md")),
-      tester:   readFile(path.join(memoriesPath, "memory-tester.md")),
-      docs:     readFile(path.join(memoriesPath, "memory-docs.md")),
-    },
-    repos: {
-      back:  extractRepo("back-repo"),
-      front: extractRepo("front-repo"),
-      db:    extractRepo("db-repo"),
-      test:  extractRepo("test-repo"),
-    },
-  };
-}
+// ─────────────────────────────────────────────────────────────
+// SYSTEM PROMPT
+// ─────────────────────────────────────────────────────────────
 
 function buildSystemPrompt(agent: AgentName, project: ProjectContext): string {
-  const role        = loadRole(agent);
+  const role        = readFile(path.join(AGENTS_ROOT, "roles", `${agent}.md`));
+  const conventions = readFile(path.join(AGENTS_ROOT, "conventions.md"));
   const skills      = loadSkills(agent, project.name);
-  const conventions = loadConventions();
   const memory      = project.memories[agent] ?? "";
+  const env         = project.envConfig;
 
-  const repoForAgent: Partial<Record<AgentName, string | undefined>> = {
-    dba:      project.repos.db,
-    backend:  project.repos.back,
-    frontend: project.repos.front,
-    tester:   project.repos.test,
+  // Repo específico del agente
+  const repoMap: Partial<Record<AgentName, string>> = {
+    dba:      env.db,
+    backend:  env.back,
+    frontend: env.front,
+    tester:   env.test,
   };
+  const agentRepo = repoMap[agent] ?? "";
 
-  const agentRepo = repoForAgent[agent];
+  // Postgres solo para DBA y Tester
+  const postgresConn = ["dba", "tester"].includes(agent) ? env.postgres : "";
 
-  return `
-${role}
-
-═══════════════════════════════════════
-CONVENCIONES DEL EQUIPO
-═══════════════════════════════════════
-${conventions}
-
-═══════════════════════════════════════
-CONTEXTO DEL PROYECTO: ${project.name}
-═══════════════════════════════════════
-${project.context}
-
-${agentRepo ? `Tu repo en este proyecto: ${agentRepo}` : ""}
-
-${project.tasks ? `Estado actual de tareas:\n${project.tasks}` : ""}
-
-${memory ? `\nTu memoria de sesiones anteriores:\n${memory}` : ""}
-
-${skills ? `\n═══════════════════════════════════════\nSKILLS — Lee esto antes de ejecutar tu tarea\n═══════════════════════════════════════${skills}` : ""}
-`.trim();
+  return [
+    role,
+    `\n\nCONVENCIONES DEL EQUIPO:\n${conventions}`,
+    `\n\nCONTEXTO DEL PROYECTO: ${project.name}\n${project.context}`,
+    agentRepo    ? `\nTu repo en este proyecto: ${agentRepo}`  : "",
+    postgresConn ? `\nConexión BD: ${postgresConn}`            : "",
+    project.tasks ? `\n\nTAREAS ACTUALES:\n${project.tasks}`  : "",
+    memory        ? `\n\nTU MEMORIA PREVIA:\n${memory}`        : "",
+    skills        ? `\n\nSKILLS:\n${skills}`                   : "",
+  ].join("").trim();
 }
 
 // ─────────────────────────────────────────────────────────────
 // AGENT RUNNER
-// Ejecuta un agente y maneja el loop de tool use
 // ─────────────────────────────────────────────────────────────
 
 export async function runAgent(
   agent:       AgentName,
   task:        string,
   projectName: string
-): Promise<RunResult> {
-  const client  = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+): Promise<string> {
   const config  = AGENT_CONFIGS[agent];
   const project = loadProjectContext(projectName);
   const system  = buildSystemPrompt(agent, project);
 
   console.log(`\n${"─".repeat(60)}`);
-  console.log(`🤖 Agente: ${agent.toUpperCase()} | Proyecto: ${projectName}`);
-  console.log(`📋 Tarea: ${task}`);
-  console.log(`${"─".repeat(60)}\n`);
+  console.log(`🤖 [${agent.toUpperCase()}] modelo: ${config.model}`);
+  console.log(`📋 ${task}`);
+  console.log(`${"─".repeat(60)}`);
 
-  const messages: Anthropic.MessageParam[] = [
-    { role: "user", content: task }
-  ];
+  const provider = await createProvider(config.model);
+  const result   = await provider.generate(system, task);
 
-  let finalResponse = "";
-  let iterations    = 0;
-  const MAX_ITER    = 10; // límite de seguridad
+  console.log(`✅ Tokens — entrada: ${result.inputTokens} | salida: ${result.outputTokens}`);
 
-  while (iterations < MAX_ITER) {
-    iterations++;
+  await updateMemoryIfPresent(agent, project.rootPath, result.text);
 
-    const response = await client.messages.create({
-      model:      config.model,
-      max_tokens: 8096,
-      system,
-      messages,
-    });
-
-    console.log(`🔄 Iteración ${iterations} | stop_reason: ${response.stop_reason}`);
-
-    // Si terminó — devolvemos la respuesta final
-    if (response.stop_reason === "end_turn") {
-      const textBlock = response.content.find(b => b.type === "text");
-      finalResponse   = textBlock?.type === "text" ? textBlock.text : "";
-      break;
-    }
-
-    // Si quiere usar una tool — la procesamos y continuamos el loop
-    if (response.stop_reason === "tool_use") {
-      messages.push({ role: "assistant", content: response.content });
-
-      const toolResults: Anthropic.ToolResultBlockParam[] = [];
-
-      for (const block of response.content) {
-        if (block.type !== "tool_use") continue;
-
-        console.log(`  🔧 Tool: ${block.name}`);
-        const result = await executeTool(block.name, block.input as Record<string, unknown>, project);
-        console.log(`  ✅ Resultado: ${String(result).slice(0, 100)}...`);
-
-        toolResults.push({
-          type:        "tool_result",
-          tool_use_id: block.id,
-          content:     String(result),
-        });
-      }
-
-      messages.push({ role: "user", content: toolResults });
-      continue;
-    }
-
-    break;
-  }
-
-  // Guardar la memoria actualizada si el agente la incluyó en su respuesta
-  await updateMemoryIfPresent(agent, projectName, finalResponse, project.rootPath);
-
-  return {
-    agent,
-    task,
-    response: finalResponse,
-    success:  finalResponse.length > 0,
-  };
-}
-
-// ─────────────────────────────────────────────────────────────
-// TOOL EXECUTOR
-// Aquí se conectan los MCPs — por ahora implementación básica
-// El orquestador real usa el MCP SDK para conectarse a los servers
-// ─────────────────────────────────────────────────────────────
-
-async function executeTool(
-  toolName: string,
-  input:    Record<string, unknown>,
-  project:  ProjectContext
-): Promise<string> {
-  switch (toolName) {
-    case "read_file": {
-      const filePath = String(input.path);
-      return readFile(filePath) || `Archivo no encontrado: ${filePath}`;
-    }
-    case "list_directory": {
-      const dirPath = String(input.path);
-      try {
-        const entries = fs.readdirSync(dirPath, { withFileTypes: true });
-        return entries.map(e => `${e.isDirectory() ? "[DIR]" : "[FILE]"} ${e.name}`).join("\n");
-      } catch {
-        return `Directorio no encontrado: ${dirPath}`;
-      }
-    }
-    case "write_file": {
-      const filePath = String(input.path);
-      const content  = String(input.content);
-      writeFile(filePath, content);
-      return `Archivo escrito: ${filePath}`;
-    }
-    default:
-      return `Tool '${toolName}' no implementada en este runner. Configura el MCP server correspondiente.`;
-  }
+  return result.text;
 }
 
 // ─────────────────────────────────────────────────────────────
 // MEMORY UPDATER
-// Extrae y guarda la memoria si el agente la incluyó
 // ─────────────────────────────────────────────────────────────
 
 async function updateMemoryIfPresent(
-  agent:     AgentName,
-  project:   string,
-  response:  string,
-  rootPath:  string
+  agent:    AgentName,
+  rootPath: string,
+  response: string
 ): Promise<void> {
-  // El agente incluye su memoria entre marcadores [MEMORY_UPDATE]...[/MEMORY_UPDATE]
   const match = response.match(/\[MEMORY_UPDATE\]([\s\S]*?)\[\/MEMORY_UPDATE\]/);
   if (!match) return;
 
@@ -355,11 +226,11 @@ async function updateMemoryIfPresent(
     : match[1].trim();
 
   writeFile(memoryPath, updated);
-  console.log(`\n💾 Memoria actualizada: memory-${agent}.md`);
+  console.log(`💾 Memoria actualizada: memory-${agent}.md`);
 }
 
 // ─────────────────────────────────────────────────────────────
-// ORQUESTADOR PRINCIPAL
+// ORQUESTADOR
 // ─────────────────────────────────────────────────────────────
 
 export async function orchestrate(
@@ -368,88 +239,69 @@ export async function orchestrate(
   agent?:      AgentName
 ): Promise<void> {
   console.log(`\n${"═".repeat(60)}`);
-  console.log(`🎯 ORQUESTADOR | Proyecto: ${projectName}`);
-  console.log(`📝 Instrucción: ${instruction}`);
+  console.log(`🎯 Proyecto: ${projectName}`);
+  console.log(`📝 ${instruction}`);
   console.log(`${"═".repeat(60)}`);
 
-  // Si se especifica un agente directamente, lo ejecuta
   if (agent) {
     const result = await runAgent(agent, instruction, projectName);
-    console.log(`\n✅ Resultado:\n${result.response}`);
+    console.log(`\n✅ Resultado:\n${result}`);
     return;
   }
 
-  // Si no, el Scrum Master decide qué agente ejecutar
-  console.log("\n🔀 Delegando al Scrum Master para determinar el siguiente paso...\n");
+  console.log("\n🔀 Consultando al Scrum Master...\n");
 
-  const scrumTask = `
-    Instrucción recibida: "${instruction}"
-
-    Lee el tasks.json del proyecto y determina:
-    1. Qué tarea corresponde a esta instrucción
-    2. Qué agente debe ejecutarla
-    3. Si tiene dependencias pendientes que la bloqueen
-
-    Responde SOLO con un JSON:
+  const scrumResponse = await runAgent("scrum", `
+    Instrucción: "${instruction}"
+    Lee tasks.json y responde SOLO con JSON sin markdown:
     {
       "agente": "dba|backend|frontend|tester|docs|po",
       "tarea_id": "T001",
-      "descripcion": "descripción exacta de la tarea",
+      "descripcion": "descripción exacta",
       "bloqueado": false,
       "motivo_bloqueo": null
     }
-  `;
-
-  const scrumResult = await runAgent("scrum", scrumTask, projectName);
+  `, projectName);
 
   try {
-    const decision = JSON.parse(
-      scrumResult.response.match(/\{[\s\S]*\}/)?.[0] ?? "{}"
-    );
+    const decision = JSON.parse(scrumResponse.match(/\{[\s\S]*\}/)?.[0] ?? "{}");
 
     if (decision.bloqueado) {
-      console.log(`\n🚫 Tarea bloqueada: ${decision.motivo_bloqueo}`);
+      console.log(`\n🚫 Bloqueado: ${decision.motivo_bloqueo}`);
       return;
     }
 
     if (!decision.agente) {
-      console.log("\n⚠️ El Scrum Master no pudo determinar el agente. Revisa tasks.json.");
+      console.log("\n⚠️  Scrum no pudo determinar el agente:\n", scrumResponse);
       return;
     }
 
-    console.log(`\n📌 Scrum asigna a: ${decision.agente.toUpperCase()} → ${decision.descripcion}`);
-
-    const result = await runAgent(
-      decision.agente as AgentName,
-      decision.descripcion,
-      projectName
-    );
-
-    console.log(`\n✅ Resultado:\n${result.response}`);
+    console.log(`\n📌 → ${decision.agente.toUpperCase()}: ${decision.descripcion}`);
+    const result = await runAgent(decision.agente as AgentName, decision.descripcion, projectName);
+    console.log(`\n✅ Resultado:\n${result}`);
 
   } catch {
-    console.log("\n⚠️ No se pudo parsear la respuesta del Scrum Master:");
-    console.log(scrumResult.response);
+    console.log("\n⚠️  No se pudo parsear la respuesta del Scrum:\n", scrumResponse);
   }
 }
 
 // ─────────────────────────────────────────────────────────────
-// CLI — Ejecución directa
-// Uso: npx ts-node orchestrator/orchestrator.ts <proyecto> <instrucción> [agente]
+// CLI
+// npx ts-node orchestrator/orchestrator.ts <proyecto> "<instruccion>" [agente]
 // ─────────────────────────────────────────────────────────────
 
 if (require.main === module) {
   const [,, projectName, instruction, agentArg] = process.argv;
 
   if (!projectName || !instruction) {
-    console.log("Uso: npx ts-node orchestrator/orchestrator.ts <proyecto> <instruccion> [agente]");
-    console.log("Ejemplo: npx ts-node orchestrator/orchestrator.ts escolar 'Crea la tabla alumnos' dba");
+    console.log("Uso:");
+    console.log("  npx ts-node orchestrator/orchestrator.ts <proyecto> \"<instruccion>\" [agente]");
+    console.log("\nEjemplos:");
+    console.log("  npx ts-node orchestrator/orchestrator.ts escolar \"Qué sigue en el proyecto\"");
+    console.log("  npx ts-node orchestrator/orchestrator.ts escolar \"Crea la tabla alumnos\" dba");
     process.exit(1);
   }
 
   orchestrate(instruction, projectName, agentArg as AgentName | undefined)
-    .catch(err => {
-      console.error("Error:", err.message);
-      process.exit(1);
-    });
+    .catch(err => { console.error("❌", err.message); process.exit(1); });
 }

@@ -1,137 +1,177 @@
 # PROMPT_INICIAL_CLAUDE_CODE.md
-# Pega este prompt en Claude Code al abrir tu repo privado por primera vez.
-# Llena las secciones marcadas con [TU_...] antes de ejecutarlo.
+# Pega este prompt en Claude Code al abrir tu repo privado.
+# Llena todas las secciones marcadas con [MAYÚSCULAS] antes de ejecutarlo.
+# NO incluyas tus API keys aquí — Claude Code las leerá del .env que crearemos.
 
 ---
 
-Hola Claude Code. Vamos a configurar mi sistema de multi-agentes de IA para desarrollo de software. Ya tengo el repo base en GitHub con toda la estructura. Necesito que me ayudes a configurar mi versión privada con mis datos reales.
+Hola Claude Code. Vamos a configurar mi sistema de multi-agentes de IA.
+Ya tengo el repo base clonado. Necesito que lo configures con mis datos reales.
 
-## Lo que ya existe en el repo
+## Estructura del repo (ya existe)
 
 ```
 agents/
-├── roles/          → 7 agentes definidos (po, scrum, dba, backend, frontend, tester, docs)
-├── skills/         → skills base en dotnet/, vue3/, postgres/
-├── conventions.md  → ramas, commits, nomenclatura
-├── prompts/        → vacío, se llena con el uso
+├── roles/           → 7 agentes (po, scrum, dba, backend, frontend, tester, docs)
+├── skills/          → dotnet/, vue3/, postgres/
+├── conventions.md
 ├── projects-memories/
-│   ├── context_example.md
-│   └── example-project/ → ejemplos de contratos y tasks
-├── mcp/
-│   ├── config.json → con placeholders
-│   └── custom/
+│   └── context_example.md
+├── mcp/config.json  → plantilla con variables de entorno
 ├── orchestrator/
 │   ├── orchestrator.ts
-│   └── orchestrator.example.ts
+│   ├── orchestrator.example.ts
+│   └── providers/   → base.ts, anthropic.ts, google.ts, openai.ts
 ├── .env.example
 ├── package.json
 └── tsconfig.json
 ```
 
-## Paso 1 — Crear el .env con mis datos reales
+---
 
-Crea el archivo `.env` en la raíz del repo con estos valores:
+## Paso 1 — Crear el .env
 
-```
+Crea el archivo `.env` en la raíz del repo con este contenido exacto,
+reemplazando los valores entre corchetes:
+
+```env
+# Rutas base
+AGENTS_ROOT=[RUTA_ABSOLUTA_DE_ESTA_CARPETA]
+PROJECTS_ROOT=[RUTA_ABSOLUTA_DE_TU_CARPETA_DE_PROYECTOS]
+
+# API Keys
 ANTHROPIC_API_KEY=[TU_ANTHROPIC_API_KEY]
-OPENAI_API_KEY=[TU_OPENAI_API_KEY]
 GOOGLE_API_KEY=[TU_GOOGLE_API_KEY]
-
+OPENAI_API_KEY=[TU_OPENAI_API_KEY]
 GITHUB_PERSONAL_ACCESS_TOKEN=[TU_GITHUB_TOKEN]
 BRAVE_API_KEY=[TU_BRAVE_API_KEY]
 
-POSTGRES_CONNECTION_STRING=[TU_CONNECTION_STRING]
+# Modelos por agente
+MODEL_PO=claude-opus-4-6
+MODEL_SCRUM=claude-opus-4-6
+MODEL_DBA=gemini-2.5-pro
+MODEL_BACKEND=gemini-2.5-pro
+MODEL_FRONTEND=gemini-2.5-pro
+MODEL_TESTER=gemini-2.5-flash
+MODEL_DOCS=gemini-2.5-flash
 
-PROJECTS_ROOT=[RUTA_ABSOLUTA_A_TUS_PROYECTOS]
-AGENTS_ROOT=[RUTA_ABSOLUTA_A_ESTA_CARPETA]
-
-DEFAULT_MODEL=claude-sonnet-4-5
+# Proyecto: [NOMBRE_PROYECTO]
+# Reemplaza NOMBRE_PROYECTO con el nombre real en mayúsculas
+# Ejemplo: si el proyecto se llama "escolar", usa ESCOLAR_BACK, ESCOLAR_FRONT, etc.
+[NOMBRE_PROYECTO]_BACK=[RUTA_ABSOLUTA]/back-repo
+[NOMBRE_PROYECTO]_FRONT=[RUTA_ABSOLUTA]/front-repo
+[NOMBRE_PROYECTO]_DB=[RUTA_ABSOLUTA]/db-repo
+[NOMBRE_PROYECTO]_TEST=[RUTA_ABSOLUTA]/test-repo
+[NOMBRE_PROYECTO]_POSTGRES=postgresql://[USUARIO]:[PASSWORD]@localhost:5432/[NOMBRE_BD]
 ```
 
-## Paso 2 — Actualizar mcp/config.json con mis rutas reales
+Si tienes más proyectos, agrega un bloque adicional por cada uno siguiendo el mismo patrón.
 
-Reemplaza los placeholders en `mcp/config.json`:
-- `TU_USUARIO` → [TU_USUARIO_LINUX]
-- `TU_GITHUB_TOKEN` → mismo del .env
-- `TU_BRAVE_API_KEY` → mismo del .env
-- `USUARIO/PASSWORD/NOMBRE_BD` → [TU_POSTGRES_CONNECTION]
+---
 
-Las rutas permitidas del filesystem deben incluir:
-- [RUTA_A_TUS_PROYECTOS]
-- [RUTA_A_ESTA_CARPETA_AGENTS]
-
-## Paso 3 — Instalar dependencias
+## Paso 2 — Instalar dependencias
 
 ```bash
 npm install
 ```
 
-Verifica que el orquestador compila sin errores:
+Verifica que compila sin errores:
 ```bash
 npx tsc --noEmit
 ```
 
-## Paso 4 — Crear mi primer proyecto real
+Si hay errores de tipos, corrígelos antes de continuar.
+## Paso 2.5 — Generar los agents/*.ts
 
-Crea la carpeta `projects-memories/[NOMBRE_DE_TU_PRIMER_PROYECTO]/` con:
+Crea un archivo por agente en la carpeta `agents/`:
+- po.ts, scrum.ts, dba.ts, backend.ts, frontend.ts, tester.ts, docs.ts
 
-### context.md
-Llénalo con estos datos:
-- **Nombre del proyecto:** [NOMBRE]
-- **Siglas:** [SIGLAS 2-5 letras]
-- **Descripción:** [QUÉ HACE EL SISTEMA]
-- **Usuarios:** [TIPOS DE USUARIO Y PERMISOS]
-- **Stack frontend:** [TU FRAMEWORK/LIBRERÍAS]
-- **Stack backend:** [TU FRAMEWORK/LENGUAJE]
-- **Base de datos:** [MOTOR Y VERSIÓN]
-- **Testing backend:** [FRAMEWORK]
-- **Testing E2E:** [FRAMEWORK]
-- **Rutas de repos:**
-  - back-repo: [RUTA]
-  - front-repo: [RUTA]
-  - db-repo: [RUTA]
-  - test-repo: [RUTA]
-- **Reglas de negocio importantes:** [LISTA]
-- **Entidades principales:** [LISTA]
+Cada archivo debe:
+1. Importar `runAgent` del orquestador
+2. Exportar una función `run(task, projectName)` que llame a `runAgent`
+3. Ser un wrapper simple — sin lógica adicional
+---
 
-### Carpeta contracts/
-Créala vacía — los contratos se generarán cuando el Backend proponga el primer endpoint.
+## Paso 3 — Crear el context.md del proyecto
 
-## Paso 5 — Verificar que el orquestador funciona
-
-Haz una prueba básica con el Scrum Master:
-
+Crea la carpeta y el archivo:
 ```bash
-npx ts-node orchestrator/orchestrator.ts [NOMBRE_PROYECTO] "Dame el estado actual del proyecto"
+mkdir -p projects-memories/[nombre_proyecto_en_minúsculas]/contracts
+cp projects-memories/context_example.md projects-memories/[nombre_proyecto_en_minúsculas]/context.md
 ```
 
-Si no hay tasks.json aún, el Scrum debe indicar que el proyecto está en fase inicial y sugerir empezar por el PO definiendo las HUs.
+Llena el `context.md` con los datos reales del proyecto:
+- Nombre del proyecto
+- Siglas (2-5 letras mayúsculas, ejemplo: `SIGLAS: ESC`)
+- Descripción del sistema
+- Tipos de usuario y permisos
+- Stack frontend
+- Stack backend
+- Motor de base de datos y versión
+- Framework de testing backend
+- Framework de testing E2E
+- Reglas de negocio importantes
+- Entidades principales del sistema
 
-## Paso 6 — Primera sesión real
-
-Una vez todo esté configurado, ejecuta:
-
-```bash
-npx ts-node orchestrator/orchestrator.ts [NOMBRE_PROYECTO] "Necesito comenzar el proyecto. El PO debe definir las primeras Historias de Usuario."
-```
+**Nota importante:** El nombre de la carpeta del proyecto debe coincidir
+en minúsculas con el prefijo de las variables del .env.
+Ejemplo: carpeta `escolar` → variables `ESCOLAR_BACK`, `ESCOLAR_POSTGRES`, etc.
 
 ---
 
-## Cosas a verificar antes de continuar
+## Paso 4 — Verificar la configuración completa
 
-- [ ] `.env` creado con todos los valores reales
-- [ ] `mcp/config.json` actualizado con rutas reales
-- [ ] `npm install` ejecutado sin errores
+Corre este checklist:
+
+```bash
+# 1. Verificar que el .env tiene todos los valores
+cat .env | grep -E "(AGENTS_ROOT|PROJECTS_ROOT|API_KEY|MODEL_)" 
+
+# 2. Verificar que el context.md existe
+ls projects-memories/[nombre_proyecto]/context.md
+
+# 3. Prueba básica del orquestador
+npx ts-node orchestrator/orchestrator.ts [nombre_proyecto] "Dame el estado actual del proyecto"
+```
+
+Si el Scrum Master responde (aunque sea diciendo que no hay tasks.json aún),
+la configuración está correcta.
+
+---
+
+## Paso 5 — Primera sesión real
+
+```bash
+npx ts-node orchestrator/orchestrator.ts [nombre_proyecto] \
+  "Iniciamos el proyecto. El PO debe definir las primeras Historias de Usuario."
+```
+
+El PO preguntará sobre los requerimientos del sistema usando la información
+del context.md. Respóndele y comenzará a generar las primeras HUs.
+
+---
+
+## Checklist final
+
+- [ ] `.env` creado con todas las variables reales
+- [ ] `npm install` sin errores
 - [ ] `npx tsc --noEmit` sin errores de tipos
 - [ ] `context.md` del proyecto creado y completo
+- [ ] Nombre de carpeta del proyecto coincide con prefijo en .env
 - [ ] Prueba básica del orquestador exitosa
 
-## Notas importantes
+---
 
-- El `.env` NUNCA se sube al repo — está en el `.gitignore`
-- Los `context.md` de proyectos reales tampoco se suben
-- Los `memory-*.md` tampoco se suben
-- El `tasks.json` real tampoco se sube
-- Solo se suben cambios a `roles/`, `skills/`, `conventions.md`, `orchestrator/`, `mcp/` (sin tokens)
+## Qué NO subir al repo (ya está en .gitignore)
 
-Cuando termines la configuración, dime y comenzamos con la primera HU del proyecto.
+```
+.env
+projects-memories/*/context.md
+projects-memories/*/memory-*.md
+projects-memories/*/tasks.json
+projects-memories/*/progress.json
+projects-memories/*/contracts/*.json
+```
+
+Solo se suben cambios a:
+`roles/` · `skills/` · `conventions.md` · `orchestrator/` · `mcp/` · `prompts/`

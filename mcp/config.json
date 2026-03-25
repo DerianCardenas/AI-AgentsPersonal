@@ -5,35 +5,40 @@
       "command": "npx",
       "args": [
         "-y",
-        "@modelcontextprotocol/server-filesystem",
-        "/home/TU_USUARIO/projects",
-        "/home/TU_USUARIO/agents"
-      ]
+        "@modelcontextprotocol/server-filesystem"
+      ],
+      "env": {
+        "ALLOWED_PATHS": "${PROJECTS_ROOT},${AGENTS_ROOT}"
+      }
     },
 
     "postgres": {
       "command": "npx",
       "args": [
         "-y",
-        "@modelcontextprotocol/server-postgres",
-        "postgresql://USUARIO:PASSWORD@localhost:5432/NOMBRE_BD"
-      ]
+        "@modelcontextprotocol/server-postgres"
+      ],
+      "env": {
+        "POSTGRES_CONNECTION_STRING": "${ACTIVE_POSTGRES}"
+      }
     },
 
     "git": {
       "command": "npx",
       "args": [
         "-y",
-        "@modelcontextprotocol/server-git",
-        "--repository", "/home/TU_USUARIO/projects"
-      ]
+        "@modelcontextprotocol/server-git"
+      ],
+      "env": {
+        "GIT_REPO_PATH": "${ACTIVE_REPO}"
+      }
     },
 
     "github": {
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-github"],
       "env": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": "TU_GITHUB_TOKEN"
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN}"
       }
     },
 
@@ -41,7 +46,7 @@
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-brave-search"],
       "env": {
-        "BRAVE_API_KEY": "TU_BRAVE_API_KEY"
+        "BRAVE_API_KEY": "${BRAVE_API_KEY}"
       }
     }
 

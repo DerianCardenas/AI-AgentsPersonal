@@ -1,114 +1,102 @@
 /**
  * orchestrator.example.ts
- *
- * Versión simplificada del orquestador — sin tokens ni rutas reales.
- * Úsala como referencia para entender la estructura.
- * El orquestador real va en tu repo privado con tu .env configurado.
+ * Versión simplificada para referencia pública.
+ * El orquestador real (orchestrator.ts) va en tu repo privado con tu .env.
  */
 
-import Anthropic from "@anthropic-ai/sdk";
-import * as fs from "fs";
-import * as path from "path";
+import * as fs     from "fs";
+import * as path   from "path";
 import * as dotenv from "dotenv";
+import { createProvider } from "./providers/base";
 
 dotenv.config();
 
-// ─────────────────────────────────────────────────────────────
-// TIPOS
-// ─────────────────────────────────────────────────────────────
-
 type AgentName = "po" | "scrum" | "dba" | "backend" | "frontend" | "tester" | "docs";
 
-interface AgentConfig {
-  model:    string;
-  mcpTools: string[];
-}
-
 // ─────────────────────────────────────────────────────────────
-// CONFIGURACIÓN — modelo y MCPs por agente
-// Los MCPs se conectan via mcp/config.json
+// Modelos leídos del .env
+// Prefijos: claude-* | gemini-* | gpt-*
+// El proveedor se detecta automáticamente en createProvider()
 // ─────────────────────────────────────────────────────────────
 
-const AGENT_CONFIGS: Record<AgentName, AgentConfig> = {
-  po:       { model: "claude-opus-4-5",   mcpTools: ["brave-search"] },
-  scrum:    { model: "claude-opus-4-5",   mcpTools: ["filesystem"] },
-  dba:      { model: "claude-sonnet-4-5", mcpTools: ["filesystem", "postgres", "git", "github"] },
-  backend:  { model: "claude-sonnet-4-5", mcpTools: ["filesystem", "git", "github", "brave-search"] },
-  frontend: { model: "claude-sonnet-4-5", mcpTools: ["filesystem", "git", "github", "brave-search"] },
-  tester:   { model: "claude-haiku-4-5",  mcpTools: ["filesystem", "git", "github", "postgres"] },
-  docs:     { model: "claude-haiku-4-5",  mcpTools: ["filesystem", "git", "github"] },
+const AGENT_MODELS: Record<AgentName, string> = {
+  po:       process.env.MODEL_PO       ?? "claude-opus-4-6",
+  scrum:    process.env.MODEL_SCRUM    ?? "claude-opus-4-6",
+  dba:      process.env.MODEL_DBA      ?? "gemini-2.5-pro",
+  backend:  process.env.MODEL_BACKEND  ?? "gemini-2.5-pro",
+  frontend: process.env.MODEL_FRONTEND ?? "gemini-2.5-pro",
+  tester:   process.env.MODEL_TESTER   ?? "gemini-2.5-flash",
+  docs:     process.env.MODEL_DOCS     ?? "gemini-2.5-flash",
 };
 
+const AGENTS_ROOT = process.env.AGENTS_ROOT ?? path.resolve(__dirname, "..");
+
+const read = (p: string) => { try { return fs.readFileSync(p, "utf-8"); } catch { return ""; } };
+
 // ─────────────────────────────────────────────────────────────
-// CÓMO SE CONSTRUYE EL SYSTEM PROMPT DE CADA AGENTE
-//
-// Cada agente recibe:
-//   1. Su rol     → roles/{agente}.md
-//   2. Sus skills → skills/{stack}/*.md  (según el stack del proyecto)
-//   3. Convenciones → conventions.md
-//   4. Contexto   → projects-memories/{proyecto}/context.md
-//   5. Su memoria → projects-memories/{proyecto}/memory-{agente}.md
-//   6. Tareas     → projects-memories/{proyecto}/tasks.json
+// System prompt
+// Cada agente recibe: rol + conventions + contexto + memoria + skills
+// Las rutas de repos y postgres vienen del .env (no del context.md)
 // ─────────────────────────────────────────────────────────────
 
 function buildSystemPrompt(agent: AgentName, projectName: string): string {
-  const agentsRoot = process.env.AGENTS_ROOT ?? path.resolve(__dirname, "..");
-  const memoriesPath = path.join(agentsRoot, "projects-memories", projectName);
+  const memoriesPath = path.join(AGENTS_ROOT, "projects-memories", projectName);
+  const key          = projectName.toUpperCase();
 
-  const read = (p: string) => { try { return fs.readFileSync(p, "utf-8"); } catch { return ""; } };
+  // Rutas desde el .env
+  const repoMap: Partial<Record<AgentName, string>> = {
+    dba:      process.env[`${key}_DB`]    ?? "",
+    backend:  process.env[`${key}_BACK`]  ?? "",
+    frontend: process.env[`${key}_FRONT`] ?? "",
+    tester:   process.env[`${key}_TEST`]  ?? "",
+  };
 
-  const role        = read(path.join(agentsRoot, "roles", `${agent}.md`));
-  const conventions = read(path.join(agentsRoot, "conventions.md"));
-  const context     = read(path.join(memoriesPath, "context.md"));
-  const memory      = read(path.join(memoriesPath, `memory-${agent}.md`));
-  const tasks       = read(path.join(memoriesPath, "tasks.json"));
+  const postgresConn = ["dba", "tester"].includes(agent)
+    ? process.env[`${key}_POSTGRES`] ?? ""
+    : "";
 
-  // Skills base según stack — el orquestador real las lee del context.md
-  // Aquí como ejemplo cargamos las de dotnet/vue3/postgres
-  const skillFiles: Partial<Record<AgentName, string[]>> = {
+  const skillMap: Partial<Record<AgentName, string[]>> = {
     backend:  ["dotnet/endpoint-structure.md", "dotnet/unit-test-xunit.md"],
     frontend: ["vue3/component-structure.md", "vue3/api-service.md"],
     dba:      ["postgres/stored-procedure.md", "postgres/migration.md"],
   };
 
   let skills = "";
-  for (const skillFile of skillFiles[agent] ?? []) {
-    skills += read(path.join(agentsRoot, "skills", skillFile));
+  for (const f of skillMap[agent] ?? []) {
+    skills += read(path.join(AGENTS_ROOT, "skills", f));
   }
 
   return [
-    role,
-    `\n\nCONVENCIONES:\n${conventions}`,
-    context     ? `\n\nCONTEXTO DEL PROYECTO:\n${context}`     : "",
-    tasks       ? `\n\nTAREAS ACTUALES:\n${tasks}`              : "",
-    memory      ? `\n\nMEMORIA PREVIA:\n${memory}`              : "",
-    skills      ? `\n\nSKILLS:\n${skills}`                      : "",
+    read(path.join(AGENTS_ROOT, "roles", `${agent}.md`)),
+    `\n\nCONVENCIONES:\n${read(path.join(AGENTS_ROOT, "conventions.md"))}`,
+    `\n\nCONTEXTO:\n${read(path.join(memoriesPath, "context.md"))}`,
+    repoMap[agent]  ? `\nTu repo: ${repoMap[agent]}`     : "",
+    postgresConn    ? `\nConexión BD: ${postgresConn}`   : "",
+    read(path.join(memoriesPath, "tasks.json"))
+      ? `\n\nTAREAS:\n${read(path.join(memoriesPath, "tasks.json"))}`  : "",
+    read(path.join(memoriesPath, `memory-${agent}.md`))
+      ? `\n\nMEMORIA:\n${read(path.join(memoriesPath, `memory-${agent}.md`))}` : "",
+    skills ? `\n\nSKILLS:\n${skills}` : "",
   ].join("").trim();
 }
 
 // ─────────────────────────────────────────────────────────────
-// AGENT RUNNER — loop de razonamiento del agente
+// Runner — usa createProvider, no importa qué SDK es
 // ─────────────────────────────────────────────────────────────
 
 async function runAgent(agent: AgentName, task: string, projectName: string): Promise<string> {
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-  const system = buildSystemPrompt(agent, projectName);
+  const model    = AGENT_MODELS[agent];
+  const system   = buildSystemPrompt(agent, projectName);
 
-  console.log(`\n→ [${agent.toUpperCase()}] ${task}`);
+  console.log(`\n→ [${agent.toUpperCase()}] (${model}) ${task}`);
 
-  const response = await client.messages.create({
-    model:      AGENT_CONFIGS[agent].model,
-    max_tokens: 8096,
-    system,
-    messages:   [{ role: "user", content: task }],
-  });
-
-  const text = response.content.find(b => b.type === "text");
-  return text?.type === "text" ? text.text : "";
+  const provider = await createProvider(model);
+  const result   = await provider.generate(system, task);
+  return result.text;
 }
 
 // ─────────────────────────────────────────────────────────────
-// ORQUESTADOR — punto de entrada
+// Orquestador
 // ─────────────────────────────────────────────────────────────
 
 async function orchestrate(
@@ -116,53 +104,41 @@ async function orchestrate(
   projectName: string,
   agent?:      AgentName
 ): Promise<void> {
-  console.log(`\n${"═".repeat(50)}`);
-  console.log(`Proyecto: ${projectName}`);
-  console.log(`Instrucción: ${instruction}`);
-  console.log(`${"═".repeat(50)}`);
+  console.log(`\nProyecto: ${projectName} | ${instruction}`);
 
   if (agent) {
-    // Agente específico — ejecución directa
-    const result = await runAgent(agent, instruction, projectName);
-    console.log(`\nRespuesta:\n${result}`);
+    console.log(await runAgent(agent, instruction, projectName));
     return;
   }
 
-  // Sin agente específico — el Scrum decide
-  const scrumResponse = await runAgent(
-    "scrum",
-    `Instrucción: "${instruction}". Lee tasks.json y dime qué agente debe ejecutar esto. Responde solo con JSON: { "agente": "nombre", "tarea": "descripción", "bloqueado": false }`,
+  const scrumResponse = await runAgent("scrum",
+    `Instrucción: "${instruction}". Lee tasks.json y responde SOLO con JSON sin markdown:
+    { "agente": "nombre", "descripcion": "tarea", "bloqueado": false, "motivo_bloqueo": null }`,
     projectName
   );
 
   try {
-    const decision = JSON.parse(scrumResponse.match(/\{[\s\S]*\}/)?.[0] ?? "{}");
-    if (decision.bloqueado) { console.log(`\nBloqueado: ${decision.motivo}`); return; }
-
-    const result = await runAgent(decision.agente, decision.tarea, projectName);
-    console.log(`\nRespuesta:\n${result}`);
+    const d = JSON.parse(scrumResponse.match(/\{[\s\S]*\}/)?.[0] ?? "{}");
+    if (d.bloqueado) { console.log(`Bloqueado: ${d.motivo_bloqueo}`); return; }
+    console.log(await runAgent(d.agente, d.descripcion, projectName));
   } catch {
-    console.log("\nRespuesta del Scrum:\n", scrumResponse);
+    console.log(scrumResponse);
   }
 }
 
 // ─────────────────────────────────────────────────────────────
 // CLI
-// npx ts-node orchestrator/orchestrator.example.ts <proyecto> <instruccion> [agente]
 // ─────────────────────────────────────────────────────────────
 
 if (require.main === module) {
   const [,, project, instruction, agentArg] = process.argv;
 
   if (!project || !instruction) {
-    console.log("Uso: npx ts-node orchestrator/orchestrator.example.ts <proyecto> <instruccion> [agente]");
-    console.log("");
-    console.log("Ejemplos:");
-    console.log('  npx ts-node orchestrator/orchestrator.example.ts escolar "Crea la tabla alumnos" dba');
-    console.log('  npx ts-node orchestrator/orchestrator.example.ts escolar "Qué sigue en el proyecto"');
+    console.log("Uso: npx ts-node orchestrator/orchestrator.example.ts <proyecto> \"<instruccion>\" [agente]");
+    console.log("Ejemplo: npx ts-node orchestrator/orchestrator.example.ts escolar \"Qué sigue\"");
     process.exit(1);
   }
 
   orchestrate(instruction, project, agentArg as AgentName | undefined)
-    .catch(err => { console.error("Error:", err.message); process.exit(1); });
+    .catch(err => { console.error("❌", err.message); process.exit(1); });
 }
