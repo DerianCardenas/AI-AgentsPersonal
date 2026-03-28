@@ -1,4 +1,4 @@
-# memory-frontend — SaaSFinancial
+# memory-frontend — EFinance (SaaSFinancial)
 
 ## Estado HU-000 — Completado (2026-03-28)
 
@@ -115,6 +115,71 @@ Estructura del router (`/src/router/index.ts`): rutas planas con `meta.requiresA
 - Stores directorio: solo `auth.ts` en `/src/stores/`
 - Composables detectados: `useTheme`, `useSessionMonitor`
 
+---
+
+## Cambios aplicados — 2026-03-28
+
+### SAASF04 — Rename MiFinanza → EFinance
+
+El nombre de la aplicación fue cambiado de "MiFinanza" a "EFinance" en todos los archivos.
+
+Archivos modificados:
+- `src/App.vue` — sidebar logo text + fallback del título de página
+- `src/views/LoginViewModern.vue` — subtitle del login
+- `src/views/RegisterViewModern.vue` — h1 del encabezado de registro
+- `src/components/AppHeaderPrime.vue` — h1 del header
+- `README.md` — título del repo
+- `.env` — `VITE_APP_NAME`
+- `.env.production` — `VITE_APP_NAME`
+- `wrangler.json` — `VITE_APP_NAME`
+- `index.html` — `<title>`
+
+Las referencias en `database/*.sql` y `PROJECT.md` son documentación/SQL y no afectan la UI — se dejaron sin cambio.
+
+---
+
+### SAASF05 — Fix ícono contraseña + mejoras diseño formularios auth
+
+#### Bug fix — toggle visibility en `<Password>` de PrimeVue 4
+
+PrimeVue 4 renderiza el botón de toggle como un `<button>` posicionado dentro del wrapper `.p-password`. El problema era que el botón heredaba `padding-bottom` diferente al padding-top, descentrándolo verticalmente.
+
+**Fix aplicado en ambas vistas:**
+```css
+:deep(.p-password button) {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 0 !important;
+  width: 24px !important;
+  height: 24px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+```
+
+El SVG interior se neutraliza con `pointer-events: none` para evitar que el click no registre.
+
+#### Mejoras en LoginViewModern.vue
+
+- Inputs con `height: 44px` uniforme y padding consistente (`0 12px` para email, `0 42px 0 12px` para password)
+- Focus ring con color accent: `box-shadow: 0 0 0 3px rgba(var(--color-primary) / 0.18)`
+- Border accent en focus: `border-color: rgb(var(--color-primary))`
+- Mensajes de error con ícono `pi pi-exclamation-circle` + texto en flex row
+- `.field-error` usa `display: flex; align-items: center; gap: 4px`
+
+#### Notas para futuros agentes
+
+- **PrimeVue 4 Password**: usa SVG icons (no font icons) para el toggle. Selector correcto: `:deep(.p-password button svg)` para colorear el ícono.
+- **RegisterViewModern.vue** usa glassmorphism (backdrop-blur, bg blanco transparente) — diferente del sistema de diseño dark-navy de la app principal. Fue creado antes de establecer el sistema de diseño actual. En una futura HU se podría unificar con el estilo de LoginViewModern.
+- **LoginViewModern.vue** sigue el sistema de diseño correcto: dark-navy + tokens CSS + cards sólidas.
+- El componente `AppHeaderPrime.vue` no está siendo usado en el layout actual (el layout está en `App.vue`). Se mantiene por compatibilidad.
+
+---
+
 ## Pendiente
 
 - HU-001 y subsiguientes
+- Unificar estilos de RegisterViewModern.vue con el sistema de diseño dark-navy (glassmorphism actual es inconsistente)
