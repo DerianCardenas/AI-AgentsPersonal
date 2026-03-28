@@ -1,5 +1,463 @@
 {
-  "proyecto": "saasfinancial",
-  "sprint_actual": null,
-  "historias": []
+  "project": "saasfinancial",
+  "initials": "SAASF",
+  "updated_at": "2026-03-28",
+  "user_stories": [
+    {
+      "id": "HU-000",
+      "title": "Setup inicial",
+      "branch": "feat-HU000",
+      "status": "pending",
+      "priority": 1,
+      "depends_on": [],
+      "tasks": {
+        "dba": {
+          "status": "completed",
+          "completed_at": "2026-03-28",
+          "migration": "20260328194227_InitialCreate",
+          "items": [
+            "Crear migración inicial EF Core con todas las tablas del schema",
+            "Verificar tipos de datos y relaciones en PostgreSQL local",
+            "Confirmar soft delete con HasQueryFilter en EF Core"
+          ]
+        },
+        "backend": {
+          "status": "completed",
+          "completed_at": "2026-03-28",
+          "commit": "SAASF02",
+          "items": [
+            "Configurar IStorageService con implementación LocalStorageService",
+            "Configurar IEmailService con implementación ResendEmailService",
+            "Configurar rate limiting en endpoints de auth",
+            "Configurar HTTPS redirect middleware",
+            "Seed automático de categorías base al registrar usuario (no seed global)"
+          ]
+        },
+        "frontend": {
+          "status": "completed",
+          "completed_at": "2026-03-28",
+          "commit": "SAASF03",
+          "items": [
+            "Verificar configuración PrimeVue darkModeSelector: .dark",
+            "Verificar variables CSS de tema en style.css",
+            "Configurar layout base: sidebar + topbar"
+          ]
+        }
+      }
+    },
+    {
+      "id": "HU-001",
+      "title": "Login",
+      "branch": "feat-HU001",
+      "status": "pending",
+      "priority": 2,
+      "depends_on": ["HU-000"],
+      "acceptance_criteria": [
+        "Usuario puede iniciar sesión con correo y contraseña",
+        "Token JWT se almacena y se incluye en peticiones posteriores",
+        "Credenciales inválidas muestran mensaje de error claro",
+        "Rutas protegidas redirigen a login si no hay sesión",
+        "Token expirado dispara refresh automático"
+      ],
+      "tasks": {
+        "backend": {
+          "status": "pending",
+          "contract": "POST_auth_login.json",
+          "items": [
+            "POST /api/v1/auth/login — validar SHA-256 + BCrypt.Verify",
+            "Generar JWT (15-30 min) + refresh token",
+            "POST /api/v1/auth/refresh — renovar access token"
+          ]
+        },
+        "frontend": {
+          "status": "pending",
+          "items": [
+            "LoginViewModern.vue con form correo + contraseña",
+            "Botón Google OAuth (placeholder — implementar en HU-013)",
+            "Auth store Pinia con token persistence en localStorage",
+            "Router guards para rutas protegidas",
+            "Interceptor Axios para token refresh en 401"
+          ]
+        }
+      }
+    },
+    {
+      "id": "HU-002",
+      "title": "Registro",
+      "branch": "feat-HU002",
+      "status": "pending",
+      "priority": 3,
+      "depends_on": ["HU-001"],
+      "acceptance_criteria": [
+        "Usuario puede registrarse con correo, contraseña y moneda",
+        "Contraseña cumple: 10+ chars, 1 mayúscula, 1 minúscula, 1 número, 1 especial",
+        "Al registrarse se crean 10 categorías base automáticamente",
+        "Errores de validación visibles por campo"
+      ],
+      "tasks": {
+        "backend": {
+          "status": "pending",
+          "contract": "POST_auth_register.json",
+          "items": [
+            "POST /api/v1/auth/register",
+            "Seed automático: 5 categorías income + 5 expense al crear usuario",
+            "Validar contraseña en backend además del frontend"
+          ]
+        },
+        "frontend": {
+          "status": "pending",
+          "items": [
+            "RegisterViewModern.vue con validaciones vee-validate + Yup",
+            "Indicador de fortaleza de contraseña",
+            "Selector de moneda (MXN, USD, EUR, etc.)"
+          ]
+        }
+      }
+    },
+    {
+      "id": "HU-003",
+      "title": "Recuperación de contraseña",
+      "branch": "feat-HU003",
+      "status": "pending",
+      "priority": 4,
+      "depends_on": ["HU-002"],
+      "acceptance_criteria": [
+        "Solo aplica para cuentas nativas (no Google OAuth)",
+        "Link enviado por correo expira en 15 minutos",
+        "Link es de un solo uso — se invalida al usarse o al expirar",
+        "Nueva contraseña cumple mismas reglas de validación"
+      ],
+      "tasks": {
+        "backend": {
+          "status": "pending",
+          "items": [
+            "POST /api/v1/auth/password-reset/request — genera token, envía email vía Resend",
+            "POST /api/v1/auth/password-reset/confirm — valida token, actualiza password"
+          ]
+        },
+        "frontend": {
+          "status": "pending",
+          "items": [
+            "Vista solicitud de recuperación (ingresa correo)",
+            "Vista nueva contraseña (recibe token en URL)"
+          ]
+        }
+      }
+    },
+    {
+      "id": "HU-004",
+      "title": "Onboarding",
+      "branch": "feat-HU004",
+      "status": "pending",
+      "priority": 5,
+      "depends_on": ["HU-002"],
+      "acceptance_criteria": [
+        "Wizard aparece en primer login (onboarding_completed = false)",
+        "Usuario puede crear cuentas iniciales con saldo $0.00",
+        "Wizard es saltable — aviso persistente si se salta",
+        "Sin cuenta registrada: formularios de gasto/ingreso bloqueados"
+      ],
+      "tasks": {
+        "backend": {
+          "status": "pending",
+          "items": [
+            "PUT /api/v1/auth/profile — actualizar onboarding_completed"
+          ]
+        },
+        "frontend": {
+          "status": "pending",
+          "items": [
+            "Componente WizardOnboarding.vue",
+            "Detectar onboarding_completed al entrar al dashboard",
+            "Aviso persistente si onboarding fue saltado"
+          ]
+        }
+      }
+    },
+    {
+      "id": "HU-005",
+      "title": "Cuentas CRUD",
+      "branch": "feat-HU005",
+      "status": "pending",
+      "priority": 6,
+      "depends_on": ["HU-002"],
+      "acceptance_criteria": [
+        "Usuario puede crear, ver, editar y desactivar cuentas",
+        "Tarjetas de crédito tienen campos extra: límite, día de corte, día de pago",
+        "Cuenta desactivada conserva historial pero no aparece en formularios",
+        "Tipos soportados: checking, savings, credit_card, cash, investment, loan"
+      ],
+      "tasks": {
+        "backend": {
+          "status": "pending",
+          "contract": "GET_account_all.json",
+          "items": [
+            "GET /api/v1/account/all",
+            "POST /api/v1/account/create",
+            "GET /api/v1/account/{id}",
+            "PUT /api/v1/account/{id}",
+            "PATCH /api/v1/account/{id}/deactivate — soft delete"
+          ]
+        },
+        "frontend": {
+          "status": "pending",
+          "items": [
+            "CuentasView.vue con tabla y modal",
+            "Campos condicionales para credit_card",
+            "Acción desactivar con confirmación"
+          ]
+        }
+      }
+    },
+    {
+      "id": "HU-006",
+      "title": "Categorías CRUD",
+      "branch": "feat-HU006",
+      "status": "pending",
+      "priority": 7,
+      "depends_on": ["HU-002"],
+      "acceptance_criteria": [
+        "Usuario puede crear, editar y eliminar sus categorías",
+        "Categorías tienen tipo: income | expense (no se mezclan)",
+        "No se puede eliminar una categoría con transacciones activas",
+        "Accesible desde sidebar y desde Perfil"
+      ],
+      "tasks": {
+        "backend": {
+          "status": "pending",
+          "items": [
+            "GET /api/v1/category/all",
+            "POST /api/v1/category/create",
+            "PUT /api/v1/category/{id}",
+            "DELETE /api/v1/category/{id} — validar transacciones activas"
+          ]
+        },
+        "frontend": {
+          "status": "pending",
+          "items": [
+            "Panel de categorías accesible desde sidebar y perfil",
+            "Separación visual income / expense",
+            "Error al intentar eliminar con transacciones activas"
+          ]
+        }
+      }
+    },
+    {
+      "id": "HU-007",
+      "title": "Gastos",
+      "branch": "feat-HU007",
+      "status": "pending",
+      "priority": 8,
+      "depends_on": ["HU-005", "HU-006"],
+      "acceptance_criteria": [
+        "Usuario puede registrar, editar y eliminar gastos",
+        "Al registrar: account.balance -= amount",
+        "Soporta compra a meses MSI y MCI",
+        "Comprobante opcional máx 2MB (jpg, jpeg, png, pdf)",
+        "Tabla paginada con filtros por día, rango, mes, año, categoría y búsqueda"
+      ],
+      "tasks": {
+        "backend": {
+          "status": "pending",
+          "contract": "POST_transaction_create.json",
+          "items": [
+            "GET /api/v1/transaction/all (type=expense)",
+            "POST /api/v1/transaction/create",
+            "PUT /api/v1/transaction/{id}",
+            "DELETE /api/v1/transaction/{id} — soft delete",
+            "Lógica de saldo: account.balance -= amount al crear",
+            "GET /api/v1/transaction/installments/summary"
+          ]
+        },
+        "frontend": {
+          "status": "pending",
+          "items": [
+            "GastosView.vue con tabla paginada (20 ítems)",
+            "Modal crear/editar/ver gasto",
+            "Upload comprobante (máx 2MB)",
+            "Campos MSI/MCI condicionales en modal",
+            "Filtros: día, rango, mes, año, categoría, búsqueda"
+          ]
+        },
+        "tester": {
+          "status": "pending",
+          "items": [
+            "E2E: crear gasto, verificar balance descontado",
+            "E2E: crear gasto MSI, verificar deuda en tarjeta",
+            "E2E: filtros de tabla"
+          ]
+        }
+      }
+    },
+    {
+      "id": "HU-008",
+      "title": "Ingresos",
+      "branch": "feat-HU008",
+      "status": "pending",
+      "priority": 9,
+      "depends_on": ["HU-005", "HU-006"],
+      "acceptance_criteria": [
+        "Misma estructura que Gastos",
+        "Al registrar: account.balance += amount",
+        "No tiene opción de compra a meses"
+      ],
+      "tasks": {
+        "backend": {
+          "status": "pending",
+          "items": [
+            "GET /api/v1/transaction/all (type=income)",
+            "POST /api/v1/transaction/create (type=income)",
+            "Lógica de saldo: account.balance += amount al crear"
+          ]
+        },
+        "frontend": {
+          "status": "pending",
+          "items": [
+            "IngresosView.vue (reusar estructura de GastosView)"
+          ]
+        }
+      }
+    },
+    {
+      "id": "HU-009",
+      "title": "Transferencias",
+      "branch": "feat-HU009",
+      "status": "pending",
+      "priority": 10,
+      "depends_on": ["HU-005"],
+      "acceptance_criteria": [
+        "Transferencia entre cuentas propias no cuenta como gasto/ingreso",
+        "No se pueden eliminar — solo editar",
+        "Aparece en últimos movimientos del dashboard",
+        "Abono a crédito detectado automáticamente cuando destino es credit_card",
+        "Para anular: editar monto a $0.00"
+      ],
+      "tasks": {
+        "backend": {
+          "status": "pending",
+          "contract": "POST_transfer_create.json",
+          "items": [
+            "GET /api/v1/transfer/all",
+            "POST /api/v1/transfer/create",
+            "GET /api/v1/transfer/{id}",
+            "PUT /api/v1/transfer/{id} — sin DELETE",
+            "Lógica: from.balance -= amount, to.balance += amount"
+          ]
+        },
+        "frontend": {
+          "status": "pending",
+          "items": [
+            "TransferenciasView.vue con tabla y modal",
+            "Detectar is_credit_payment cuando destino es credit_card",
+            "Sin opción de eliminar en acciones"
+          ]
+        }
+      }
+    },
+    {
+      "id": "HU-010",
+      "title": "Dashboard",
+      "branch": "feat-HU010",
+      "status": "pending",
+      "priority": 11,
+      "depends_on": ["HU-007", "HU-008", "HU-009"],
+      "acceptance_criteria": [
+        "3 gráficas: gastos vs ingresos, gastos por categoría, ingresos por categoría",
+        "Tabla últimos movimientos configurable: 5, 10 o 15",
+        "Transferencias aparecen en tabla pero NO en gráficas",
+        "Filtros: día, rango de fechas, mes, año — sin fechas futuras",
+        "Filtro predeterminado: mes actual"
+      ],
+      "tasks": {
+        "backend": {
+          "status": "pending",
+          "contract": "GET_dashboard_summary.json",
+          "items": [
+            "GET /api/v1/dashboard/summary (filtros: day, range, month, year)",
+            "GET /api/v1/dashboard/expenses-by-category",
+            "GET /api/v1/dashboard/monthly-stats"
+          ]
+        },
+        "frontend": {
+          "status": "pending",
+          "items": [
+            "DashboardViewNew.vue con 3 gráficas Chart.js",
+            "Tabla últimos movimientos con selector 5/10/15",
+            "Filtros de período sin fechas futuras",
+            "Filtro predeterminado = mes actual"
+          ]
+        }
+      }
+    },
+    {
+      "id": "HU-011",
+      "title": "Reportes",
+      "branch": "feat-HU011",
+      "status": "pending",
+      "priority": 12,
+      "depends_on": ["HU-010"],
+      "acceptance_criteria": [
+        "Descarga en PDF o XLSX",
+        "Tipos: solo gastos, solo ingresos, comparativo",
+        "Mismos filtros que dashboard",
+        "Si notify_on_report = true: enviar por correo al generar"
+      ],
+      "tasks": {
+        "backend": {
+          "status": "pending",
+          "items": [
+            "POST /api/v1/report/generate — genera PDF o XLSX",
+            "Envío por correo vía Resend si notify_on_report = true"
+          ]
+        },
+        "frontend": {
+          "status": "pending",
+          "items": [
+            "ReportesView.vue con selector de tipo, formato y período"
+          ]
+        }
+      }
+    },
+    {
+      "id": "HU-012",
+      "title": "Perfil",
+      "branch": "feat-HU012",
+      "status": "pending",
+      "priority": 13,
+      "depends_on": ["HU-001"],
+      "acceptance_criteria": [
+        "Ver foto, nombre, correo, método de auth, fecha de registro",
+        "Cambiar contraseña solo para cuentas nativas",
+        "Toggle notificaciones por correo: 3 opciones independientes",
+        "Toggle tema claro/oscuro",
+        "Gestionar categorías propias desde perfil"
+      ],
+      "tasks": {
+        "backend": {
+          "status": "pending",
+          "items": [
+            "GET /api/v1/auth/me",
+            "PUT /api/v1/auth/profile — nombre, avatar, moneda, tema, notificaciones"
+          ]
+        },
+        "frontend": {
+          "status": "pending",
+          "items": [
+            "PerfilView.vue con secciones: datos, seguridad, notificaciones, tema",
+            "Toggle notify_on_movement, notify_on_report, notify_monthly_balance",
+            "Cambio de contraseña (solo cuentas nativas)"
+          ]
+        }
+      }
+    }
+  ],
+  "phase_2": [
+    "HU-013 — Google OAuth completo",
+    "HU-014 — Verificación en dos pasos",
+    "HU-015 — Suscripciones",
+    "HU-016 — Households / cuentas compartidas",
+    "HU-017 — AI Insights en dashboard",
+    "HU-018 — Selector de temas de color",
+    "HU-019 — CRUD destinatarios para transferencias"
+  ]
 }
