@@ -1,0 +1,28 @@
+{
+  "project": "saasfinancial",
+  "updated_at": "2026-03-28",
+  "current_sprint": "HU-003",
+  "summary": {
+    "total_hu": 13,
+    "completed": 3,
+    "in_progress": 0,
+    "pending": 10,
+    "blocked": 0
+  },
+  "hu_status": {
+    "HU-000": "completed",
+    "HU-001": "completed",
+    "HU-002": "completed",
+    "HU-003": "pending",
+    "HU-004": "pending",
+    "HU-005": "pending",
+    "HU-006": "pending",
+    "HU-007": "pending",
+    "HU-008": "pending",
+    "HU-009": "pending",
+    "HU-010": "pending",
+    "HU-011": "pending",
+    "HU-012": "pending"
+  },
+  "notes": "2026-03-28 — HU-002 completada. Backend: POST /register HTTP 201, email único (IgnoreQueryFilters), BCrypt sobre SHA-256, CategorySeedService.SeedAsync invocado, 10 monedas soportadas. Frontend: useRegistration reescrito con vee-validate+Yup, indicador de fortaleza 4 niveles con tokens CSS, selector de moneda, store.register con SHA-256 y redirect a onboarding. Sprint actual: HU-003 (Recuperación de contraseña)."
+}

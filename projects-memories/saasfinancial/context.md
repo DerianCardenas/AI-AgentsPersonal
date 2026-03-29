@@ -1,256 +1,128 @@
-# Proyecto: SaaSFinancial — Sistema de Finanzas Personales Multiusuario
+# SaaSFinancial — EFinance
 
-## Descripción general
+## Identificación
+- **Nombre**: EFinance
+- **Iniciales de proyecto**: SAASF
+- **Owner**: Derian
+- **Tipo**: Aplicación de finanzas personales
 
-Aplicación de finanzas personales llamada **MiFinanza**. Owner: Derian.
-Permite registrar ingresos, gastos y transferencias entre cuentas, categorizarlos y visualizarlos mediante dashboards con gráficos interactivos y filtros avanzados. Incluye autenticación JWT, auditoría y está orientado a evolucionar hacia multiusuario con organizaciones. Integración opcional con ChatGPT para insights de gasto.
+## Repos
+- **Frontend**: `github.com/DerianCardenas/04-DashboardFinanzas`
+  - Ruta local: `/home/seki/Documentos/Proyectos/04-DashboardFinanzas`
+- **Backend**: `github.com/DerianCardenas/04-DashboardFinanzasBackendV2`
+  - Ruta local: `/home/seki/Documentos/Proyectos/DashboardFinancieroBackendV2`
 
-El proyecto tiene un MVP funcional: frontend Vue 3 + backend .NET 9 conectados, con CRUD de transacciones, cuentas, categorías, suscripciones y dashboard con gráficos.
-
-## Siglas del proyecto
-
-SIGLAS: SAASF
-
-## Usuarios del sistema
-
-- **Usuario autenticado**: acceso completo a sus propios datos (transacciones, cuentas, categorías, dashboard)
-- *(Futuro)* Roles: Owner > Admin > Member > Viewer en contexto de organizaciones
-
----
-
-## Stack tecnológico
+## Stack
 
 ### Frontend
-Vue 3.4 + TypeScript 5.3 (Strict Mode) + Vite 5.0 + **PrimeVue 4.0** + Tailwind CSS 3.4 + Pinia 2.1 + Vue Router 4.2 + Axios 1.6 + Chart.js 4.4 + vue-chartjs 5.3
+- Vue 3.5 + TypeScript 5.8 (Composition API, `<script setup>`)
+- Vite 5.4 | PrimeVue 4.3 (preset Aura) | Tailwind CSS 4.1
+- Pinia 3.0 | Axios 1.11 | Vue Router 4.5
+- Chart.js 4.5 + vue-chartjs | vee-validate + Yup | date-fns 4.1
 
 ### Backend
-**.NET 9** / C# + ASP.NET Core + **CQRS con MediatR** + EF Core + Npgsql + AutoMapper + JWT Bearer + Swagger/OpenAPI
+- .NET 9 | ASP.NET Core | EF Core + Npgsql | MediatR 12 (CQRS)
+- AutoMapper 14 | JWT Bearer | Swagger/OpenAPI
+- Patrón CQRS basado en semov_backend
+- Ruta semov_backend: `/home/seki/Documentos/Proyectos/semov_backend`
 
-Patrón de llamada: `Controller → Execute(Command/Query) → MediatR → Handler → Service (Infrastructure) → EF Core → AutoMapper → BaseResponse`
+### Infraestructura
+- BD local: PostgreSQL en `localhost:5432` (db: `mifinanza`, user: `mifinanza`, pass: `mifinanza_local_db`)
+- BD producción: Supabase (PostgreSQL)
+- Storage: Local en dev / Supabase Storage en prod (capa intercambiable via `IStorageService`)
+- Correos: Resend API (no Gmail API)
+- Deploy: Netlify (frontend) + Railway (backend)
 
-Respuesta estándar del API:
-```json
-{ "data": {}, "message": "Se ha realizado la petición con exito" }
-```
-
-**NUNCA poner lógica de negocio en Controllers.** Los controllers solo despachan al mediator.
-
-### Base de datos
-**PostgreSQL local** en `localhost:5432`
-- BD: `mifinanza` | Usuario: `mifinanza` | Password: `mifinanza_local_db`
-- Tablas creadas vía EF Core migration `InitialCreate`: `profiles`, `accounts`, `categories`, `transactions`, `subscriptions`
-- Supabase se mantiene como referencia/producción remota
-
-### Testing
-- Unitarias Backend: xUnit + Moq
-- Unitarias Frontend: Vitest + Vue Test Utils
-- Integración: Vitest + MSW (Mock Service Worker)
-- E2E: Playwright
-
-### Otros
-- Autenticación: JWT (Access Token 15 min + Refresh Token 7 días)
-- Storage tokens: localStorage (`access_token`, `refresh_token`)
-- IA: ChatGPT API para insights (feature Premium futura)
-- `dotnet-ef` instalado globalmente (`~/.dotnet/tools/dotnet-ef`)
-
----
-
-## Repositorios
-
-back-repo:  C:\Users\PC\Documents\Programming\SaaSFinanciero\04-DashboardFinanzasBackendV2
-front-repo: C:\Users\PC\Documents\Programming\SaaSFinanciero\04-DashboardFinanzas
-
-Repo remoto backend: `git@github.com:DerianCardenas/04-DashboardFinanzasBackendV2.git`
-
----
-
-## Ramas Frontend
-
-| Rama | Estado |
-|---|---|
-| `master` | Base estable, integración API completa, tema dark slate fijo |
-| `feat-redesign` | **Rama activa de desarrollo** — Rediseño enterprise: sidebar, toggle dark/claro, indigo primary |
-
-### Rediseño UI (rama `feat-redesign`)
-- Sistema de diseño: dark-navy como base, indigo (#6366f1) como accent, tokens CSS en variables RGB
-- Layout: sidebar fijo colapsable (desktop) / overlay (móvil), topbar con toggle y logout
-- Tema: dark por defecto, toggle claro/oscuro (`darkModeSelector: '.dark'` en PrimeVue config, aplica clase `.dark` en `<html>`)
-- Sin glassmorphism — cards sólidas con bordes sutiles
-- Componentes rediseñados: `style.css`, `App.vue`, `ThemeToggle.vue`, `LoginViewModern.vue`, `ReportesView.vue`
-- `useSessionMonitor.ts` usa `useNotifications` (NO PrimeVue `useToast`). `App.vue` no tiene `<Toast>` de sesión.
-
----
-
-## Estructura de carpetas
-
-### back-repo/ (04-DashboardFinanzasBackendV2)
-```
-DashboardFinanciero.sln
-├── Library/          → Base reutilizable: AppException, BaseResponse, middleware, ScopedRegistrationAttribute
-├── Infrastructure/   → EF Core DbContext, entidades, migraciones, repos, servicios de datos
-├── Domain/           → CQRS: Commands, Queries, Handlers, AutoMapper profiles, TransformHandler base
-└── Application/      → Controllers, DI wiring, Program.cs, appsettings, BaseController
-```
-Referencias: `Application → Domain → Infrastructure → Library`
-
-Archivos clave del patrón (referencia: semov_backend):
-- `Domain/Source/TransformHandler.cs` — Base de todos los handlers
-- `Library/Source/V1/Application/AppException.cs` — Modelo de excepciones
-- `Library/Source/V1/Domain/Response/BaseResponse.cs` — Respuesta estándar
-- `Application/Source/Configuration/BaseController.cs` — Base de controllers
-- `Library/Source/Helper/Attribute/ScopedRegistrationAttribute.cs` — Auto-registro DI
-
-### front-repo/ (04-DashboardFinanzas)
-```
-src/
-├── components/
-│   ├── charts/              → BarChartComponent, LineChartComponent, DoughnutChartComponent
-│   ├── TransactionForm.vue
-│   ├── TransactionTable.vue / TransactionList.vue
-│   ├── TransactionFilters.vue
-│   └── TransactionActions.vue
-├── views/
-│   ├── DashboardViewNew.vue   → Dashboard principal (USAR ESTE — DashboardView.vue es legacy)
-│   ├── TransactionsView.vue
-│   ├── GastosView.vue / IngresosView.vue / CuentasView.vue / ResumenView.vue
-│   ├── ReportesView.vue       → rediseñada en feat-redesign
-│   ├── LoginViewModern.vue / RegisterViewModern.vue
-│   └── ThemeToggle.vue        → toggle dark/claro (feat-redesign)
-├── stores/
-│   └── auth.ts               → Pinia, tokens en localStorage
-├── composables/
-│   ├── useNotifications.ts   → Toast notifications
-│   └── useSessionMonitor.ts  → Monitor de sesión (usa useNotifications, no useToast)
-├── infrastructure/api/
-│   ├── apiClient.ts          → Axios + interceptores JWT + refresh automático en 401
-│   └── services/
-│       ├── dashboardService.ts / transactionService.ts
-│       ├── accountService.ts / categoryService.ts / healthService.ts
-├── types/
-│   ├── dashboard.ts / transaction.ts
-└── router/index.ts           → guards requiresAuth / requiresGuest
-```
-
----
-
-## Endpoints del API
-
-Base: `http://localhost:5000/api/v1/`
-
-| Módulo | Endpoints |
-|---|---|
-| Auth | `POST auth/register`, `POST auth/login`, `GET auth/logout`, `GET auth/me`, `PUT auth/profile` |
-| Cuentas | `GET/POST account/all`, `GET/PUT/DELETE account/{id}`, `GET account/summary` |
-| Transacciones | `GET/POST transaction/all`, `GET/PUT/DELETE transaction/{id}`, `GET transaction/installments/summary` |
-| Categorías | `GET category/all`, `POST category/create`, `PUT/DELETE category/{id}` |
-| Dashboard | `GET dashboard/summary`, `GET dashboard/monthly-stats`, `GET dashboard/debt-summary`, `GET dashboard/expenses-by-category` |
-| Suscripciones | `GET/POST subscription/all`, `PUT/DELETE subscription/{id}`, `GET subscription/summary` |
-| Reportes | `POST report/generate` |
-
----
-
-## Convenciones de código
-
-### .NET Backend
-- Usar `record` para Commands y Queries
-- Handlers heredan de `TransformHandler<T, TRequest, TResponse>` o implementan `IRequestHandler` directamente
-- Servicios llevan `[ScopedRegistration]` para auto-registro DI
-- Entidades llevan `[Table("nombre_tabla")]` y `[Column("nombre_columna")]` explícitos
-- Rutas en minúsculas: `/api/v1/{dominio}/{accion}`
-- Respuesta siempre `BaseResponse` (con `data` y `message`)
-- Excepciones de negocio: clases de `AppException`
-- `IHttpContext`: solo `GetToken()` y `GetUserId()`. `HttpContextContext` extrae UUID del JWT.
-
-### Frontend Vue
-- Composition API con `<script setup>` en todos los componentes
-- Servicios en `infrastructure/api/services/` — uno por dominio
-- Stores Pinia en `stores/`
-- Composables en `composables/`
-- Orden en `<script setup>`: Imports → Types → Props & Emits → Composables → State → Computed → Methods → Lifecycle
-
-### Nomenclatura — Base de datos
-- snake_case para tablas y columnas
-- Prefijo `idx_` para índices, `uc_` para unique constraints, `fk_` para foreign keys
-
----
-
-## Reglas de negocio importantes
-
-1. **Tipos de transacción**: Income, Expense, Transfer. Transfers no requieren categoría.
-2. **Categorías por tipo**: Se filtran según tipo de transacción (income/expense).
-3. **Seguridad auth**: Frontend hashea password con **SHA-256** antes de enviar. Backend recibe el hash SHA-256 y lo re-hashea con **BCrypt** antes de guardar. En login: `BCrypt.Verify(sha256Hash, storedBcryptHash)`.
-4. **Soft delete selectivo**: `AccountEntity` y `TransactionEntity` tienen `DeletedAt` con `HasQueryFilter` en EF Core. `CategoryEntity` usa hard delete.
-5. **MSI/MCI**: No genera transacciones automáticas. Calcula cuotas restantes por fecha de compra. El pago mensual de tarjeta se registra manualmente.
-6. **No lógica en controllers**: Solo despachan al mediator. Lógica va en Handler → Service (Infrastructure).
-7. **Tema en `feat-redesign`**: `darkModeSelector: '.dark'` — PrimeVue lee la clase `.dark` en `<html>`, la aplica `useTheme.ts`.
-8. **PrimeVue dark mode overrides**: Usar `:deep()` CSS para sobreescribir estilos de componentes PrimeVue.
-9. **Fechas**: Locale español en PrimeVue config (`main.ts`). Formato `dd/mm/yy` en todos los Calendar.
-10. **Chart.js font.weight**: Debe ser número (`weight: 500`), no string.
-11. **Array.isArray()** antes de `.join()` en filtros de cuentas (evita TypeError cuando se limpia el filtro).
-12. **`DashboardView.vue` es legacy** — usar siempre `DashboardViewNew.vue`.
-
----
+## Convenciones de ramas y commits
+- Ramas: `feat-HU{número}` | `fix-HU{número}-{descripcion}`
+- Base para ramas: siempre desde `dev`
+- PRs siempre a `dev`, nunca a `master`
+- Commits: `SAASF{número} | {Descripción corta en español}`
+- Ejemplo: `SAASF01 | Migración inicial de base de datos creada`
 
 ## Entidades principales
+`profiles` · `accounts` · `categories` · `transactions` · `transfers` · `password_reset_tokens`
 
-- **Profile/User**: persona con email, password (BCrypt de SHA-256), nombre, estado activo
-- **Account**: cuenta financiera (banco, efectivo, tarjeta) con saldo y `DeletedAt`
-- **Transaction**: registro de ingreso/gasto/transferencia, con `DeletedAt`
-- **Category**: clasificación de transacciones por tipo (hard delete)
-- **Subscription**: suscripciones recurrentes del usuario
-- *(Futuro)* **Organization**: empresa/grupo con miembros y roles
-- *(Futuro)* **AuditLog**: auditoría de acciones
+Fase 2: `households` · `household_members` · `subscriptions`
 
----
+## Reglas de negocio críticas
 
-## Ambientes
+### Soft delete
+Todas las entidades usan soft delete (`deleted_at`) excepto:
+- `transfers`: no se eliminan, solo se editan. Para anular: editar monto a $0
+- `categories`: hard delete, verificar que no tenga transacciones activas antes de eliminar
 
-### Desarrollo
-URL base API: http://localhost:5000
-URL frontend:  http://localhost:5173 (Vite)
-BD:            `Host=localhost;Port=5432;Database=mifinanza;Username=mifinanza;Password=mifinanza_local_db`
+### Saldos
+- Gasto: `account.balance -= amount`
+- Ingreso: `account.balance += amount`
+- Transferencia normal: `from.balance -= amount` | `to.balance += amount`
+- Abono a crédito (`is_credit_payment=true`): igual que transferencia normal (reduce deuda)
 
-### Producción (remoto)
-URL backend: https://04-dashboard-finanzas-backend.vercel.app
-BD: Supabase PostgreSQL (puerto 6543, SSL requerido)
+### Seguridad
+- Frontend: hashear password con SHA-256 antes de enviar
+- Backend: re-hashear con BCrypt antes de guardar
+- JWT: expiración 15-30 min + refresh token
+- Rate limiting en todos los endpoints de auth
+- Links de recuperación: un solo uso, expiran en 15 minutos
+- HTTPS forzoso en producción
 
----
+### MSI/MCI
+- MSI: `cuota = monto / meses`, sin interés
+- MCI: amortización francesa con tasa anual ingresada por el usuario
+- Al registrar compra a meses: saldo se descuenta inmediatamente de la tarjeta
 
-## Comandos para ejecutar
+### Categorías base (se crean al registrar un usuario)
+- income: Salario, Freelance, Inversión, Préstamo, Otros
+- expense: Alimentación, Renta, Hipoteca, Electricidad, Internet
 
-### Backend
-```bash
-cd "C:\Users\PC\Documents\Programming\SaaSFinanciero\04-DashboardFinanzasBackendV2\Application"
-dotnet run   # → http://localhost:5000, Swagger en http://localhost:5000/swagger
+### Onboarding
+- Wizard al primer login (`onboarding_completed = false`)
+- Saltable — aviso persistente si se salta
+- Sin al menos una cuenta: formularios de gasto/ingreso bloqueados
+
+## Patrón CQRS (semov_backend)
+```
+Controller → BaseController.Execute(Command/Query)
+  → IMediator.Send()
+    → Handler.Handle()
+      → Service.Execute() [en Infrastructure]
+        → EF Core
+      → return BaseResponse(data)
 ```
 
-### Frontend
-```bash
-cd "C:\Users\PC\Documents\Programming\SaaSFinanciero\04-DashboardFinanzas"
-npm run dev   # → http://localhost:5173
+### Naming
+| Artefacto | Patrón |
+|---|---|
+| Command | `{Accion}{Entidad}Command` |
+| Query | `{Accion}{Entidad}Query` |
+| Handler | `{Command/Query}Handler` |
+| Service | `{Accion}{Entidad}Service` |
+| Entity | `{Entidad}Entity` |
+| DTO | `{Entidad}Model` |
+
+### Respuesta estándar
+```json
+{ "data": { ... }, "message": "Se ha realizado la petición con éxito" }
 ```
 
-### Migraciones EF Core
+## Sistema de diseño (frontend)
+- Base: dark-navy | Accent: indigo `#6366f1`
+- Tokens CSS como variables RGB
+- Tema dark por defecto, toggle claro/oscuro
+- Layout: sidebar fijo colapsable (desktop) / overlay (móvil)
+- Cards sólidas con bordes sutiles — sin glassmorphism
+- PrimeVue: `darkModeSelector: '.dark'`
+
+## Ejecutar localmente
 ```bash
-cd Infrastructure
-~/.dotnet/tools/dotnet-ef migrations add NombreMigracion --startup-project ../Application
+# Backend
+cd DashboardFinancieroBackendV2/Application && dotnet run  # → localhost:5000
+
+# Frontend
+cd 04-DashboardFinanzas && npm run dev  # → localhost:5173
+
+# Migraciones
+cd DashboardFinancieroBackendV2/Infrastructure
+~/.dotnet/tools/dotnet-ef migrations add {Nombre} --startup-project ../Application
 ~/.dotnet/tools/dotnet-ef database update --startup-project ../Application
 ```
-
----
-
-## Pendientes
-
-- [ ] Migrar datos desde Supabase a BD local (o crear seed data)
-- [ ] Continuar rediseño de otras vistas en `feat-redesign` (Gastos, Ingresos, Cuentas, Dashboard)
-- [ ] Merge de `feat-redesign` → `master` cuando el cliente apruebe el diseño
-- [ ] Verificar integración completa frontend ↔ backend .NET 9 local
-
----
-
-## Notas adicionales
-
-- Backend de referencia de arquitectura: `semov_backend` (en equipo anterior — Linux). Consultar para replicar patrón exacto de handlers, services y DI.
-- Backend Laravel en `04-DashboardFinanzasBackend/` — **solo de referencia para lógica de negocio, NO MODIFICAR**.
-- No hay `04-DashboardFinanzasBackend/` en este equipo Windows — solo el V2 .NET 9.
-- `appsettings.Development.json` en Application/ — nunca commitear (contiene connection string y JWT key).

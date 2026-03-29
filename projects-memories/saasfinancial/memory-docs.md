@@ -1,4 +1,4 @@
-# Memoria: docs — SaaSFinancial
+# memory-docs — SaaSFinancial
 
-## Estado
-Sin actividad aún. Primera sesión pendiente.
+## Documentado
+_Nada aún — documentar lo que Tester apruebe_

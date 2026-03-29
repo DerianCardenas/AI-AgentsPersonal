@@ -7,7 +7,8 @@
       "id": "HU-000",
       "title": "Setup inicial",
       "branch": "feat-HU000",
-      "status": "pending",
+      "status": "completed",
+      "completed_at": "2026-03-28",
       "priority": 1,
       "depends_on": [],
       "tasks": {
@@ -36,11 +37,14 @@
         "frontend": {
           "status": "completed",
           "completed_at": "2026-03-28",
-          "commit": "SAASF03",
+          "commits": ["SAASF03", "SAASF04", "SAASF05", "SAASF06"],
           "items": [
             "Verificar configuración PrimeVue darkModeSelector: .dark",
             "Verificar variables CSS de tema en style.css",
-            "Configurar layout base: sidebar + topbar"
+            "Configurar layout base: sidebar + topbar",
+            "Rename MiFinanza → EFinance en todos los archivos",
+            "Fix ícono contraseña centrado verticalmente en inputs de auth",
+            "RegisterViewModern.vue rediseñado: eliminado glassmorphism, consistente con LoginView"
           ]
         }
       }
@@ -49,7 +53,8 @@
       "id": "HU-001",
       "title": "Login",
       "branch": "feat-HU001",
-      "status": "pending",
+      "status": "completed",
+      "completed_at": "2026-03-28",
       "priority": 2,
       "depends_on": ["HU-000"],
       "acceptance_criteria": [
@@ -61,16 +66,22 @@
       ],
       "tasks": {
         "backend": {
-          "status": "pending",
+          "status": "completed",
+          "completed_at": "2026-03-28",
+          "commit": "SAASF07",
           "contract": "POST_auth_login.json",
           "items": [
-            "POST /api/v1/auth/login — validar SHA-256 + BCrypt.Verify",
-            "Generar JWT (15-30 min) + refresh token",
-            "POST /api/v1/auth/refresh — renovar access token"
+            "POST /api/v1/auth/login — validar SHA-256 + BCrypt.Verify + authProvider check",
+            "Generar JWT (30 min) + refresh token (rotation, SHA-256 hasheado en BD)",
+            "POST /api/v1/auth/refresh — renovar access token con rotation",
+            "GET /api/v1/auth/me — verificado y funcional",
+            "Migración AddRefreshToken: columnas refresh_token_hash + refresh_token_expires_at en profiles"
           ]
         },
         "frontend": {
-          "status": "pending",
+          "status": "completed",
+          "completed_at": "2026-03-28",
+          "commit": "SAASF08",
           "items": [
             "LoginViewModern.vue con form correo + contraseña",
             "Botón Google OAuth (placeholder — implementar en HU-013)",
@@ -85,7 +96,8 @@
       "id": "HU-002",
       "title": "Registro",
       "branch": "feat-HU002",
-      "status": "pending",
+      "status": "completed",
+      "completed_at": "2026-03-28",
       "priority": 3,
       "depends_on": ["HU-001"],
       "acceptance_criteria": [
@@ -96,16 +108,22 @@
       ],
       "tasks": {
         "backend": {
-          "status": "pending",
+          "status": "completed",
+          "completed_at": "2026-03-28",
+          "commit": "SAASF09",
           "contract": "POST_auth_register.json",
           "items": [
-            "POST /api/v1/auth/register",
-            "Seed automático: 5 categorías income + 5 expense al crear usuario",
-            "Validar contraseña en backend además del frontend"
+            "POST /api/v1/auth/register — HTTP 201, retorna LoginModel con tokens",
+            "Seed automático: 5 categorías income + 5 expense al crear usuario (CategorySeedService.SeedAsync)",
+            "Validación de contraseña: solo longitud 64 chars (SHA-256 hex) — fortaleza validada en frontend",
+            "Email único con IgnoreQueryFilters (incluye soft-deleted) → 409",
+            "Monedas soportadas: MXN, USD, EUR, GBP, CAD, AUD, JPY, CHF, CNY, BRL"
           ]
         },
         "frontend": {
-          "status": "pending",
+          "status": "completed",
+          "completed_at": "2026-03-28",
+          "commit": "SAASF10",
           "items": [
             "RegisterViewModern.vue con validaciones vee-validate + Yup",
             "Indicador de fortaleza de contraseña",
@@ -118,7 +136,8 @@
       "id": "HU-003",
       "title": "Recuperación de contraseña",
       "branch": "feat-HU003",
-      "status": "pending",
+      "status": "completed",
+      "completed_at": "2026-03-28",
       "priority": 4,
       "depends_on": ["HU-002"],
       "acceptance_criteria": [
@@ -129,14 +148,18 @@
       ],
       "tasks": {
         "backend": {
-          "status": "pending",
+          "status": "completed",
+          "completed_at": "2026-03-28",
+          "commit": "SAASF11",
           "items": [
             "POST /api/v1/auth/password-reset/request — genera token, envía email vía Resend",
             "POST /api/v1/auth/password-reset/confirm — valida token, actualiza password"
           ]
         },
         "frontend": {
-          "status": "pending",
+          "status": "completed",
+          "completed_at": "2026-03-28",
+          "commit": "SAASF12",
           "items": [
             "Vista solicitud de recuperación (ingresa correo)",
             "Vista nueva contraseña (recibe token en URL)"
@@ -148,7 +171,8 @@
       "id": "HU-004",
       "title": "Onboarding",
       "branch": "feat-HU004",
-      "status": "pending",
+      "status": "completed",
+      "completed_at": "2026-03-28",
       "priority": 5,
       "depends_on": ["HU-002"],
       "acceptance_criteria": [
@@ -159,13 +183,17 @@
       ],
       "tasks": {
         "backend": {
-          "status": "pending",
+          "status": "completed",
+          "completed_at": "2026-03-28",
+          "commit": "SAASF13",
           "items": [
             "PUT /api/v1/auth/profile — actualizar onboarding_completed"
           ]
         },
         "frontend": {
-          "status": "pending",
+          "status": "completed",
+          "completed_at": "2026-03-28",
+          "commit": "SAASF14",
           "items": [
             "Componente WizardOnboarding.vue",
             "Detectar onboarding_completed al entrar al dashboard",
