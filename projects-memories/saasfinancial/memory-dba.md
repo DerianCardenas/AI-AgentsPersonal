@@ -75,5 +75,24 @@ Migración `20260328194227_InitialCreate` aplicada el 2026-03-28 en la BD local 
 | Nombre | Fecha | Estado |
 |---|---|---|
 | `20260328194227_InitialCreate` | 2026-03-28 | Aplicada en local |
+| `20260402234730_AddAccountMetadataFields` | 2026-04-02 | Aplicada en local |
+
+### `20260402234730_AddAccountMetadataFields` — Detalle
+
+Agrega 5 columnas a la tabla `accounts`:
+
+```sql
+ALTER TABLE accounts ADD bank_name text;
+ALTER TABLE accounts ADD color text NOT NULL DEFAULT '';
+ALTER TABLE accounts ADD icon text NOT NULL DEFAULT '';
+ALTER TABLE accounts ADD include_in_totals boolean NOT NULL DEFAULT FALSE;
+ALTER TABLE accounts ADD notes text;
+```
+
+**Motivo:** Los campos existían en el request DTO (`CreateAccountRequest`) y en los CommandHandlers desde el inicio, pero no estaban mapeados en `AccountEntity` ni en `AccountModel`. Los datos se aceptaban en el endpoint pero se descartaban silenciosamente sin persistirse.
+
+**Columnas completas de `accounts` tras la migración:**
+
+`id`, `profile_id`, `name`, `type`, `balance`, `currency`, `credit_limit`, `cut_day`, `payment_day`, `bank_name`, `color`, `icon`, `notes`, `include_in_totals`, `is_active`, `created_at`, `updated_at`, `deleted_at`
 
 ## Estado: COMPLETADO (HU-000 DBA)

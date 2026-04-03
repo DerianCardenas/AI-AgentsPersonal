@@ -483,6 +483,117 @@ La creación de cuentas en el wizard llama `POST /api/v1/account/create`. Funcio
 ### Nota para HU-007/008
 El bloqueo de formularios de gasto/ingreso sin cuenta registrada se implementará en HU-007/008 cuando haya acceso al endpoint de cuentas.
 
-## Pendiente
+---
 
-- HU-005 y subsiguientes
+## Estado HU-005 — Accounts (bugs resueltos en sesión 2026-04-02)
+
+### Bug 1 — OnboardingView.vue enviaba `type` en vez de `accountType`
+
+`OnboardingView.vue` línea ~284 hacía POST a `/api/v1/account/create` con payload `{ type: acc.type }` en vez de `{ accountType: acc.type }`.
+
+- **Fix:** cambiado a `accountType: acc.type`
+- El backend usa CamelCase y espera `accountType`
+
+---
+
+### Bug 2 — AccountForm.vue enviaba snake_case al backend
+
+`AccountForm.vue` enviaba payload con snake_case (`account_type`, `bank_name`, `is_active`, `include_in_totals`, `credit_limit`, `billing_day`, `payment_due_day`) cuando el backend espera camelCase.
+
+**Fix — payload corregido a camelCase:**
+```typescript
+const dataToSend = {
+  name, accountType, balance, currency,
+  bankName, color, icon, notes,
+  isActive, includeInTotals,
+  // crédito:
+  creditLimit, billingDay, paymentDueDay
+}
+```
+
+---
+
+### Bug 3 — AccountForm.vue en modo edit no mostraba el tipo de cuenta seleccionado
+
+`onMounted` leía `props.account.account_type` pero el backend retorna `accountType` (camelCase).
+Resultado: `formData.account_type = undefined` → ningún botón de tipo quedaba seleccionado.
+
+**Fix aplicado en `onMounted`:**
+```typescript
+const acc = props.account as any
+formData.value = {
+  account_type: acc.accountType ?? acc.account_type,
+  bank_name: acc.bankName ?? acc.bank_name ?? '',
+  is_active: acc.isActive ?? acc.is_active,
+  include_in_totals: acc.includeInTotals ?? acc.include_in_totals,
+  credit_limit: acc.creditLimit ?? acc.credit_limit,
+  billing_day: acc.billingDay ?? acc.billing_day,
+  payment_due_day: acc.paymentDueDay ?? acc.payment_due_day,
+  // ... resto igual
+}
+```
+
+---
+
+### Bug 4 — AccountForm.vue bloqueaba edición del tipo de cuenta
+
+El modo `edit` tenía `disabled` en los botones de tipo de cuenta con mensaje "(No editable)".
+
+- **Fix:** eliminado el bloqueo — el tipo de cuenta es editable en ambos modos (create y edit).
+
+---
+
+### Mejora — Checkboxes rediseñados como toggles tipo tarjeta
+
+Los checkboxes de PrimeVue (`<Checkbox>`) para "Cuenta activa" e "Incluir en totales" fueron reemplazados por botones tipo tarjeta clickeables:
+
+- **Cuenta activa:** borde y fondo **verde** (`emerald-500`) cuando activo. Muestra "Visible y operativa" / "Oculta en el dashboard".
+- **En totales:** borde y fondo **azul** (`blue-500`) cuando activo. Muestra "Suma al balance total" / "Excluida del balance".
+- Icono contextual con `pi-check-circle` / `pi-circle` para activo, `pi-chart-bar` para totales.
+- Import de `Checkbox` eliminado de `AccountForm.vue`.
+
+---
+
+### Convención crítica — frontend siempre camelCase
+
+**El frontend trabaja exclusivamente con camelCase**, tanto al enviar como al recibir del backend.
+
+- Los interfaces (`Account`, `CreateAccountData`) pueden usar snake_case como tipos internos del estado del formulario, pero al enviar al API siempre se transforma a camelCase.
+- `_mapUser` en `auth.ts` lee campos camelCase del response (`raw.onboardingCompleted`, `raw.fullName`, etc.)
+- NO usar snake_case en payloads enviados al backend.
+
+**`auth.ts` — `_mapUser` lee camelCase (confirmado):**
+```typescript
+function _mapUser(raw: any): UserProfile {
+  return {
+    fullName: raw.fullName,
+    onboardingCompleted: !!raw.onboardingCompleted,
+    authProvider: raw.authProvider,
+    // ...
+  }
+}
+```
+
+---
+
+## HU-006 — En progreso (2026-04-02)
+
+**Google Login (implementado junto a HU-006):**
+- `index.html`: SDK GSI cargado `<script src="https://accounts.google.com/gsi/client" async defer>`
+- `auth.ts`: acción `loginWithGoogle(idToken)` — POST `/api/v1/auth/google`, mismo patrón que `login()`
+- `.env` / `.env.production`: `VITE_GOOGLE_CLIENT_ID` agregado
+- `LoginViewModern.vue`: botón Google habilitado con `handleGoogleLogin()` usando `window.google.accounts.id.initialize` + `prompt()`
+- Requiere origen autorizado en Google Cloud Console
+
+**Vista de Perfil:**
+- `src/views/ProfileView.vue` — vista nueva con 4 cards:
+  1. Información personal (fullName, email readonly, currency) → `updateProfile()`
+  2. Apariencia (toggle dark/light con `useTheme`)
+  3. Notificaciones (3 toggles que guardan inmediatamente)
+  4. Seguridad (change-password para nativos, mensaje informativo para Google)
+- Ruta: `/perfil` (`meta: { requiresAuth: true }`)
+- `auth.ts`: `UserProfile` ampliado con `notifyOnMovement`, `notifyOnReport`, `notifyMonthlyBalance`; `_mapUser()` actualizado
+- `App.vue`: navItem "Perfil" con `pi pi-user` + avatar del footer como RouterLink a `/perfil`
+- Seguridad: hashea con `sha256Hex` antes de `POST /api/v1/auth/change-password`
+
+**Pendiente:** HU-007 y subsiguientes

@@ -204,3 +204,101 @@ El frontend envía el password ya hasheado con SHA-256 (64 chars hex). Validar f
   "message": "Cuenta creada correctamente"
 }
 ```
+
+## HU-005 — Accounts CRUD — Completado (2026-04-02)
+
+### Endpoints implementados
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| POST | /api/v1/account/create | Crear cuenta |
+| PUT | /api/v1/account/{id} | Actualizar cuenta |
+| GET | /api/v1/account/all | Obtener todas las cuentas del usuario |
+| GET | /api/v1/account/{id} | Obtener cuenta por ID |
+| DELETE | /api/v1/account/{id} | Eliminar cuenta (soft delete) |
+
+### Bugs resueltos en sesión
+
+**Bug 1 — JSON naming policy incorrecta**
+- El backend tenía `JsonNamingPolicy.CamelCase` en `ApplicationService.cs`
+- El frontend envía y espera camelCase — la policy CamelCase es la correcta
+- Durante la sesión se intentó cambiar a `SnakeCaseLower` pero se revirtió porque rompía el auth
+- **Estado final:** se mantiene `CamelCase` — es la correcta para este proyecto
+
+**Bug 2 — Campos faltantes en AccountEntity / AccountModel**
+- Los campos `bank_name`, `color`, `icon`, `notes`, `include_in_totals` existían en `CreateAccountRequest` y en los CommandHandlers, pero NO estaban en `AccountEntity` ni en `AccountModel`
+- Resultado: esos campos se aceptaban en el request pero se descartaban silenciosamente y nunca se retornaban en el response
+
+### Fix aplicado
+
+**1. `AccountEntity`** — agregadas 5 columnas:
+- `[Column("bank_name")] public string? BankName`
+- `[Column("color")] public string Color = "#22c55e"`
+- `[Column("icon")] public string Icon = "🏦"`
+- `[Column("notes")] public string? Notes`
+- `[Column("include_in_totals")] public bool IncludeInTotals = true`
+
+**2. `AccountModel`** — agregados los mismos 5 campos en el response DTO
+
+**3. `GetAllAccountService.Map()`** — actualizado para mapear los nuevos campos de entity a model
+
+**4. `CreateAccountService.Execute()`** — ahora lee y persiste: `bankName`, `color`, `icon`, `notes`, `includeInTotals`
+
+**5. `UpdateAccountService.Execute()`** — ahora actualiza: `bankName`, `color`, `icon`, `notes`, `includeInTotals`
+
+### Migración creada y aplicada
+- Nombre: `20260402234730_AddAccountMetadataFields`
+- Columnas agregadas a tabla `accounts`: `bank_name text`, `color text NOT NULL DEFAULT ''`, `icon text NOT NULL DEFAULT ''`, `include_in_totals boolean NOT NULL DEFAULT FALSE`, `notes text`
+
+### Nota sobre naming
+Los campos en el response usan camelCase (`bankName`, `accountType`, `includeInTotals`, etc.) — el backend tiene `JsonNamingPolicy.CamelCase`. Los campos en BD usan snake_case (`bank_name`, `type`, `include_in_totals`) mapeados vía `[Column]` attributes.
+
+### Response de account (campos completos)
+```json
+{
+  "id": "uuid",
+  "profileId": "uuid",
+  "name": "string",
+  "accountType": "checking|savings|cash|credit_card|investment|loan",
+  "balance": 0,
+  "currency": "MXN",
+  "creditLimit": null,
+  "cutDay": null,
+  "paymentDay": null,
+  "bankName": "string|null",
+  "color": "#22c55e",
+  "icon": "🏦",
+  "notes": "string|null",
+  "includeInTotals": true,
+  "isActive": true,
+  "createdAt": "ISO8601",
+  "updatedAt": "ISO8601"
+}
+```
+
+## HU-006 — En progreso (2026-04-02)
+
+**Nuevo endpoint implementado:**
+
+`POST /api/v1/auth/change-password` (requiere JWT)
+- Request: `{ currentPassword: string (SHA-256 hex 64 chars), newPassword: string (SHA-256 hex 64 chars) }`
+- Valida: `authProvider == "native"` — cuentas Google no pueden cambiar contraseña aquí
+- Valida: contraseña actual correcta con BCrypt.Verify
+- Valida: nueva contraseña distinta a la actual
+- Actualiza: `password_hash` con nuevo BCrypt hash
+- Invalida refresh token (`refresh_token_hash = null`, `refresh_token_expires_at = null`)
+- Response: `{ "data": null, "message": "Contraseña actualizada correctamente" }`
+
+**Archivos creados:**
+- `Domain/Source/V1/Scheme/Auth/ChangePassword/` — 3 archivos (Request, Command, Handler)
+- `Infrastructure/Source/V1/Service/Auth/ChangePasswordService.cs`
+
+**Archivo modificado:**
+- `AuthController.cs` — endpoint `[Authorize][HttpPost("change-password")]`
+
+**Nota Google Login (sin HU numerada, implementado 2026-04-02):**
+- `POST /api/v1/auth/google` — recibe `idToken` de Google, valida con `Google.Apis.Auth`, hace upsert del perfil
+- Paquete: `Google.Apis.Auth 1.73.0` en Infrastructure
+- Config: `Google:ClientId` en appsettings.json
+- Archivos: `GoogleLoginRequest`, `GoogleLoginCommand`, `GoogleLoginCommandHandler`, `GoogleLoginService`
+- Colisión: email nativo + Google → 400 con mensaje claro
